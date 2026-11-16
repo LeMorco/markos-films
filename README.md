@@ -16,7 +16,7 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 ## Movimiento e interacción
 
 - **Portadas rotatorias** en el inicio (5 fotogramas, 4 s cada uno, con barras de progreso clicables y pausa al pasar el ratón).
-- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. Al salir se descarga. Para añadir un proyecto nuevo, ejecuta `python tools/make_previews.py` (ver cabecera del script).
+- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. Al salir se descarga. Para añadir un proyecto nuevo, ejecuta `python tools/make_previews.py` (ver cabecera del script). Si tienes los vídeos originales en buena calidad, déjalos en `tools/maestros/` (nombre con el slug o el id de YouTube) y genera los clips desde ahí, sin pasar por YouTube: `python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19`. Esa carpeta está en `.gitignore`.
 - **Revelado tipográfico**: los titulares suben desde una máscara al entrar en pantalla.
 - **Parallax** suave en las portadas del grid (solo escritorio).
 - **Scroll con inercia** en ratón/trackpad + **barra de progreso** en el borde derecho.

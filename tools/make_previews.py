@@ -2,18 +2,28 @@
 """
 Genera los clips de vista previa (assets/video/preview/<slug>.mp4).
 
-Para cada proyecto de assets/js/data.js con campo "youtube" descarga un
-fragmento de 7 s (desde "preview", por defecto el segundo 15), lo deja sin
-audio, a 640 px de ancho y con el mínimo peso posible. Son los clips mudos
-que se reproducen al pasar el ratón por una tarjeta.
+Para cada proyecto de assets/js/data.js con campo "youtube" coge un fragmento
+de 7 s (desde "preview", por si no autoelige el tramo más luminoso), lo deja
+sin audio y sin controles. Son los clips mudos que se reproducen al pasar el
+ratón por una tarjeta.
+
+La fuente puede ser YouTube (se descarga) o una carpeta con los vídeos
+originales en buena calidad, mucho mejor opción.
 
 Requisitos:
-    pip install yt-dlp imageio-ffmpeg
+    pip install imageio-ffmpeg      (y yt-dlp solo si se descarga de YouTube)
 
 Uso:
+    # a partir de los vídeos originales en tools/maestros/
+    python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19
+
+    # descargando de YouTube
     python tools/make_previews.py              # solo los que faltan
     python tools/make_previews.py --force      # regenera todos
     python tools/make_previews.py --dur 6      # otra duración
+
+En --local el nombre del fichero debe contener el id de YouTube del proyecto
+o su slug ("Mina - trailer.mp4", "mina.mp4", "dQw4w9WgXcQ.mp4"...).
 """
 import argparse
 import os
@@ -47,6 +57,41 @@ def proyectos():
             yield slug, yt.group(1), int(pv.group(1)) if pv else None
 
 
+EXTENSIONES = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".mts", ".m2ts", ".mpg", ".mpeg", ".wmv")
+
+
+def normalizar(txt):
+    return re.sub(r"[^a-z0-9]+", "", txt.lower())
+
+
+def maestros(carpeta):
+    """[(nombre, ruta)] con los vídeos de una carpeta local."""
+    if not os.path.isdir(carpeta):
+        sys.exit("No existe la carpeta: " + carpeta)
+    lista = []
+    for f in sorted(os.listdir(carpeta)):
+        if f.lower().endswith(EXTENSIONES):
+            lista.append((f, os.path.join(carpeta, f)))
+    if not lista:
+        sys.exit("No hay vídeos en " + carpeta)
+    return lista
+
+
+def buscar_maestro(lista, slug, vid):
+    """Empareja por id de YouTube, luego por slug exacto y luego por parecido."""
+    for nombre, ruta in lista:
+        if vid and vid in nombre:
+            return ruta
+    for nombre, ruta in lista:
+        if normalizar(os.path.splitext(nombre)[0]) == normalizar(slug):
+            return ruta
+    clave = normalizar(slug)
+    for nombre, ruta in lista:
+        if clave and clave in normalizar(os.path.splitext(nombre)[0]):
+            return ruta
+    return None
+
+
 def brillo_por_segundo(ff, ruta):
     """Brillo medio (0-255) de un fotograma por segundo."""
     r = subprocess.run([ff, "-v", "error", "-i", ruta,
@@ -76,6 +121,8 @@ def main():
     ap.add_argument("--dur", type=int, default=7, help="segundos de clip (7)")
     ap.add_argument("--ancho", type=int, default=960, help="ancho en px (960)")
     ap.add_argument("--crf", type=int, default=21, help="calidad x264, menos = mejor (21)")
+    ap.add_argument("--local", metavar="CARPETA",
+                    help="usa los vídeos originales de esta carpeta en vez de YouTube")
     args = ap.parse_args()
     ffmpeg_filtro = (
         "scale=%d:-2:flags=lanczos,unsharp=5:5:0.7:5:5:0.0" % args.ancho
@@ -84,6 +131,8 @@ def main():
     ff = ffmpeg()
     os.makedirs(SALIDA, exist_ok=True)
     tmp = tempfile.mkdtemp(prefix="previews_")
+    lista = maestros(args.local) if args.local else None
+    usados = set()
 
     for slug, vid, inicio in proyectos():
         destino = os.path.join(SALIDA, slug + ".mp4")
@@ -91,18 +140,28 @@ def main():
             print("ya existe:", slug)
             continue
         print("==>", slug, vid)
-        base = os.path.join(tmp, vid)
-        r = subprocess.run([
-            sys.executable, "-m", "yt_dlp",
-            "--extractor-args", "youtube:player_client=android",
-            "-f", "b[height<=480]/b", "-o", base + ".%(ext)s",
-            "https://www.youtube.com/watch?v=" + vid,
-        ])
-        ficheros = [f for f in os.listdir(tmp) if f.startswith(vid + ".")]
-        if r.returncode != 0 or not ficheros:
-            print("   error al descargar, se omite")
-            continue
-        origen = os.path.join(tmp, ficheros[0])
+        descargado = False
+        if lista is not None:
+            origen = buscar_maestro(lista, slug, vid)
+            if not origen:
+                print("   no hay ningún vídeo original para este proyecto, se omite")
+                continue
+            usados.add(origen)
+            print("   origen:", os.path.basename(origen))
+        else:
+            base = os.path.join(tmp, vid)
+            r = subprocess.run([
+                sys.executable, "-m", "yt_dlp",
+                "--extractor-args", "youtube:player_client=android",
+                "-f", "b[height<=480]/b", "-o", base + ".%(ext)s",
+                "https://www.youtube.com/watch?v=" + vid,
+            ])
+            ficheros = [f for f in os.listdir(tmp) if f.startswith(vid + ".")]
+            if r.returncode != 0 or not ficheros:
+                print("   error al descargar, se omite")
+                continue
+            origen = os.path.join(tmp, ficheros[0])
+            descargado = True
         if inicio is None:
             inicio = mejor_inicio(brillo_por_segundo(ff, origen), args.dur)
         print("   tramo desde", inicio, "s")
@@ -117,8 +176,13 @@ def main():
             print("   ok", os.path.getsize(destino) // 1024, "KB")
         else:
             print("   error al recortar")
-        os.remove(origen)
+        if descargado:
+            os.remove(origen)
 
+    if lista is not None:
+        sobrantes = [os.path.basename(n) for n, r in lista if r not in usados]
+        if sobrantes:
+            print("Sin proyecto asociado:", ", ".join(sobrantes))
     shutil.rmtree(tmp, ignore_errors=True)
 
 
