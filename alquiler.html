@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alquiler de material — Marcos Donate</title>
+<meta name="description" content="Catálogo de material de iluminación en alquiler. Selecciona equipos y solicita presupuesto.">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<nav>
+  <a href="index.html" class="brand">
+    <strong>Marcos Donate</strong>
+    <span>Técnico de iluminación</span>
+  </a>
+  <div class="nav-links">
+    <a href="index.html">Inicio</a>
+    <a href="proyectos.html">Proyectos</a>
+    <a class="active" href="alquiler.html">Alquiler</a>
+    <a href="sobre-mi.html">Sobre mí</a>
+    <a href="contacto.html">Contacto</a>
+  </div>
+  <div class="nav-right">
+    <button class="cart-btn" type="button" data-cart-open aria-label="Ver solicitud">
+      <span class="cart-label">Solicitud</span>
+      <span class="cart-count" data-cart-count data-empty="true">0</span>
+    </button>
+    <button class="burger" aria-label="Menú" aria-expanded="false"><span></span><span></span><span></span></button>
+  </div>
+</nav>
+
+<header class="page-head">
+  <h1>Alquiler de material</h1>
+  <p class="lead">Equipo de iluminación disponible para otras producciones. Añade al listado lo que necesites y envía una solicitud: recibiré el material seleccionado junto con tus fechas y te prepararé un presupuesto.</p>
+  <div class="meta-row">
+    <div><span>Recogida</span><p>A convenir con cada producción</p></div>
+    <div><span>Respuesta</span><p>Presupuesto por correo</p></div>
+  </div>
+</header>
+
+<div class="rent-layout">
+  <aside class="rent-side">
+    <div>
+      <h3>Categorías</h3>
+      <div class="rent-cats" id="rent-cats"></div>
+    </div>
+    <div>
+      <h3>Buscar</h3>
+      <input class="search" id="rent-search" type="search" placeholder="Nombre, marca o modelo" aria-label="Buscar material">
+    </div>
+    <div>
+      <h3>Tu solicitud</h3>
+      <p style="font-size:13px;line-height:1.8;color:var(--text-dim);margin-bottom:0.9rem;">
+        <b id="cart-badge">0</b> tipo(s) de material seleccionado
+      </p>
+      <button class="btn btn-primary btn-sm" type="button" data-cart-open>Ver y solicitar</button>
+    </div>
+  </aside>
+
+  <div>
+    <div class="chips only-mobile" id="rent-chips" style="margin-bottom:1.4rem;"></div>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1.1rem;border-bottom:0.5px solid var(--faint);padding-bottom:0.7rem;">
+      <span class="label"><span id="rent-count">0</span> equipos</span>
+      <span class="label">Sin precios publicados</span>
+    </div>
+    <div class="rent-grid" id="rent-grid"></div>
+  </div>
+</div>
+
+<!-- panel de solicitud -->
+<div class="cart-backdrop" id="cart-backdrop"></div>
+<aside class="cart-panel" id="cart-panel" aria-label="Solicitud de presupuesto">
+  <div class="cart-head">
+    <h2>Solicitud de presupuesto</h2>
+    <button class="icon-btn" type="button" data-cart-close aria-label="Cerrar">&#10005;</button>
+  </div>
+  <div class="cart-items" id="cart-items"></div>
+  <form class="cart-form" id="cart-form">
+    <div class="field-row">
+      <div class="field">
+        <label for="cf-nombre">Nombre</label>
+        <input id="cf-nombre" name="nombre" required autocomplete="name">
+      </div>
+      <div class="field">
+        <label for="cf-email">Email</label>
+        <input id="cf-email" name="email" type="email" required autocomplete="email">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="cf-desde">Desde</label>
+        <input id="cf-desde" name="desde" type="date">
+      </div>
+      <div class="field">
+        <label for="cf-hasta">Hasta</label>
+        <input id="cf-hasta" name="hasta" type="date">
+      </div>
+    </div>
+    <div class="field">
+      <label for="cf-proyecto">Proyecto o productora</label>
+      <input id="cf-proyecto" name="proyecto" placeholder="Opcional">
+    </div>
+    <div class="field">
+      <label for="cf-notas">Notas</label>
+      <textarea id="cf-notas" name="notas" rows="2" placeholder="Necesidades de luz, localización, transporte…"></textarea>
+    </div>
+    <p class="form-note">Al enviar se abrirá tu cliente de correo con la solicitud preparada, dirigida a markosfilms1@gmail.com. También puedes copiarla.</p>
+    <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
+      <button class="btn btn-primary btn-sm" type="submit">Enviar solicitud</button>
+      <button class="btn btn-sm" type="button" data-copy>Copiar</button>
+    </div>
+    <p class="form-status" id="form-status" role="status"></p>
+  </form>
+</aside>
+
+<!-- ficha de material -->
+<div class="modal" id="info-modal">
+  <div class="modal-box" id="info-box"></div>
+</div>
+
+<footer>
+  <span>&copy; 2026 Marcos Donate</span>
+  <div class="footer-links">
+    <a href="https://www.instagram.com/markosfilms/" target="_blank" rel="noopener">Instagram</a>
+    <a href="mailto:markosfilms1@gmail.com">markosfilms1@gmail.com</a>
+  </div>
+</footer>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/rental.js"></script>
+<script src="assets/js/main.js"></script>
+<script src="assets/js/alquiler.js"></script>
+</body>
+</html>
