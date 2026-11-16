@@ -88,6 +88,12 @@
     !(navigator.connection && navigator.connection.saveData) &&
     !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  /* si la pestaña vuelve al frente YouTube puede haber pausado el embed:
+     se reanuda la preview activa para que no quede el icono de pausa */
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && previewActivo && previewActivo.reanudar) previewActivo.reanudar();
+  });
+
   function bindPreviews(root) {
     if (!puedePreview || !root) return;
     [].forEach.call(root.querySelectorAll(".card[data-yt]:not([data-preview])"), function (card) {
@@ -98,11 +104,42 @@
       if (isNaN(inicio) || inicio < 0) inicio = 15;
       var timer = null;
       var frame = null;
+      var golpes = [];
+      var oyente = null;
+
+      /* control del reproductor por postMessage (YouTube IFrame API) */
+      function mandar(func) {
+        if (!frame) return;
+        try {
+          frame.contentWindow.postMessage(
+            JSON.stringify({ event: "command", func: func, args: [] }), "*"
+          );
+        } catch (e) {}
+      }
+
+      /* YouTube pausa el embed en algunos casos (autoplay bloqueado,
+         cambio de pestaña, sugerencia al final del clip). Al detectar la
+         pausa se vuelve a arrancar: así nunca queda el icono de pausa. */
+      function vigilar(win) {
+        if (oyente) window.removeEventListener("message", oyente);
+        oyente = function (e) {
+          if (!frame || e.source !== win) return;
+          var dato = e.data;
+          if (typeof dato === "string") {
+            try { dato = JSON.parse(dato); } catch (err) { return; }
+          }
+          if (!dato || dato.event !== "onStateChange") return;
+          /* 0 = terminado, 2 = en pausa, 5 = cargado sin arrancar */
+          if (dato.info === 0 || dato.info === 2 || dato.info === 5) mandar("playVideo");
+        };
+        window.addEventListener("message", oyente);
+      }
 
       function cargar() {
         if (frame) return;
         /* una sola preview activa a la vez */
         if (previewActivo) previewActivo.cerrar();
+        var origen = /^https?:$/.test(location.protocol) ? location.origin : "";
         frame = document.createElement("iframe");
         frame.className = "card-preview";
         frame.setAttribute("tabindex", "-1");
@@ -112,16 +149,40 @@
         frame.src =
           "https://www.youtube-nocookie.com/embed/" + id +
           "?autoplay=1&mute=1&controls=0&loop=1&playlist=" + id +
-          "&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&start=" + inicio;
+          "&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1" +
+          "&fs=0&showinfo=0&cc_load_policy=0&autohide=1&enablejsapi=1" +
+          "&start=" + inicio +
+          (origen ? "&origin=" + encodeURIComponent(origen) : "");
+        var win = null;
         frame.addEventListener("load", function () {
-          if (frame) frame.classList.add("visible");
+          if (!frame) return;
+          win = frame.contentWindow;
+          frame.classList.add("visible");
+          vigilar(win);
+          /* handshake de la IFrame API: sin esto el reproductor no envía
+             onReady / onStateChange a la página */
+          try {
+            frame.contentWindow.postMessage(
+              JSON.stringify({ event: "listening", id: id }), "*"
+            );
+          } catch (e) {}
+          /* varios intentos: el reproductor tarda en estar listo y a veces
+             ignora el primero (autoplay bloqueado o buffering) */
+          mandar("mute");
+          mandar("playVideo");
+          golpes = [300, 900, 1800, 3200].map(function (ms) {
+            return setTimeout(function () { mandar("playVideo"); }, ms);
+          });
         });
         card.appendChild(frame);
-        previewActivo = { card: card, cerrar: descargar };
+        previewActivo = { card: card, cerrar: descargar, reanudar: function () { mandar("playVideo"); } };
       }
 
       function descargar() {
         clearTimeout(timer);
+        golpes.forEach(clearTimeout);
+        golpes = [];
+        if (oyente) { window.removeEventListener("message", oyente); oyente = null; }
         if (previewActivo && previewActivo.card === card) previewActivo = null;
         if (!frame) return;
         var f = frame;
