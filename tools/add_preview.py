@@ -194,10 +194,18 @@ def main():
         return
 
     rel = os.path.relpath(destino, RAIZ).replace("\\", "/")
-    subprocess.run(["git", "-C", RAIZ, "add", rel], check=True)
-    subprocess.run(["git", "-C", RAIZ, "commit", "-q", "-m",
-                    "Preview de %s desde el vídeo original" % slug], check=True)
-    subprocess.run(["git", "-C", RAIZ, "push", "-q", "origin", "main"], check=True)
+    git = lambda *a: subprocess.run(["git", "-C", RAIZ] + list(a), capture_output=True, text=True)
+    git("add", rel)
+    if git("diff", "--cached", "--quiet").returncode == 0:
+        print("El clip ya está publicado con ese mismo contenido; no hay nada que subir.")
+        return
+    # mensaje sin acentos para que git no lo guarde con codificación rara
+    r = git("-c", "user.useConfigOnly=false", "commit", "-q", "-m",
+            "Preview de %s (desde el video original)" % slug)
+    if r.returncode != 0:
+        sys.exit("No se pudo hacer commit: " + (r.stderr or r.stdout).strip())
+    if git("push", "-q", "origin", "main").returncode != 0:
+        sys.exit("No se pudo hacer push. El clip queda listo en local; revisa la conexión.")
     print("\nPublicado. Vercel lo despliega en ~1 minuto:")
     print("  https://markos-films.vercel.app/assets/video/preview/%s.mp4" % slug)
 
