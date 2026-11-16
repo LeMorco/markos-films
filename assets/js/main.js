@@ -50,6 +50,9 @@
     var m = { videoclip: "Videoclip", cortometraje: "Cortometraje", spot: "Spot", documental: "Documental", ficcion: "Ficción" };
     return m[t] || t || "";
   }
+  function artistaCorto(p) {
+    return String(p.artista || "").split("·")[0].trim();
+  }
   function thumb(p) {
     return p.youtube ? "https://i.ytimg.com/vi/" + p.youtube + "/maxresdefault.jpg" : "";
   }
@@ -60,7 +63,7 @@
         '<div class="card-body">' +
           '<span class="card-type">' + esc(tipoLabel(p.tipo)) + "</span>" +
           '<span class="card-title">' + esc(p.titulo) + "</span>" +
-          (p.artista ? '<span class="card-client">' + esc(p.artista) + "</span>" : "") +
+          (p.artista ? '<span class="card-client">' + esc(artistaCorto(p)) + "</span>" : "") +
         "</div></a>";
     }
     var inner =
@@ -68,7 +71,7 @@
       '<div class="card-body">' +
         '<span class="card-type">' + esc(tipoLabel(p.tipo)) + "</span>" +
         '<span class="card-title">' + esc(p.titulo) + "</span>" +
-        (p.artista ? '<span class="card-client">' + esc(p.artista) + "</span>" : "") +
+        (p.artista ? '<span class="card-client">' + esc(artistaCorto(p)) + "</span>" : "") +
       "</div>";
     return '<a class="card" href="proyecto.html?p=' + encodeURIComponent(p.slug) + '">' + inner + "</a>";
   }
@@ -142,7 +145,7 @@
 
       document.getElementById("pj-titulo").innerHTML = esc(p.titulo);
       document.getElementById("pj-sub").innerHTML =
-        esc(tipoLabel(p.tipo)) + (p.artista ? " · " + esc(p.artista) : "");
+        esc(tipoLabel(p.tipo)) + (p.artista ? " · " + esc(artistaCorto(p)) : "");
       document.getElementById("pj-funcion").innerHTML = pend(p.rol);
       document.getElementById("pj-director").innerHTML = pend(p.director);
       document.getElementById("pj-productora").innerHTML = pend(p.productora || p.artista);

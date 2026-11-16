@@ -55,23 +55,24 @@
   function gearCard(m, idx) {
     var inCart = read().some(function (i) { return i.id === m.id; });
     var cat = (R.categorias.filter(function (c) { return c.id === m.categoria; })[0] || {}).nombre || "";
-    var spec = m.marca || m.modelo
-      ? [m.marca, m.modelo].filter(Boolean).join(" · ")
-      : "Marca y modelo por confirmar";
+    var spec = m.notas || "Ficha pendiente";
+
+    var img = m.foto
+      ? '<img src="' + m.foto + '" alt="' + String(m.nombre).replace(/"/g, "&quot;") + '" loading="lazy">'
+      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.6 6.6 5.2 5.2M18.8 18.8l-1.4-1.4M6.6 17.4l-1.4 1.4M18.8 5.2l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>';
 
     return '<article class="gear">' +
-      '<div class="gear-img">' +
-        '<span class="gear-num">' + String(idx + 1).padStart(2, "0") + "</span>" +
-        '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v2M12 19v2M5 12H3M21 12h-2M6.6 6.6 5.2 5.2M18.8 18.8l-1.4-1.4M6.6 17.4l-1.4 1.4M18.8 5.2l-1.4 1.4"/><circle cx="12" cy="12" r="4"/></svg>' +
+      '<div class="gear-img" data-info="' + m.id + '" role="button" tabindex="0">' + img +
+        '<span class="gear-num">' + m.codigo + "</span>" +
       "</div>" +
       '<div class="gear-body">' +
         '<span class="gear-cat">' + cat.replace(/</g, "&lt;") + "</span>" +
-        '<h3 class="gear-name">' + m.nombre.replace(/</g, "&lt;") + "</h3>" +
-        '<p class="gear-spec' + (m.marca || m.modelo ? "" : " pending") + '">' + spec + "</p>" +
+        '<h3 class="gear-name">' + String(m.nombre).replace(/</g, "&lt;") + "</h3>" +
+        '<p class="gear-spec">' + spec.replace(/</g, "&lt;") + "</p>" +
         '<div class="gear-foot">' +
           '<button class="gear-add' + (inCart ? " added" : "") + '" data-add="' + m.id + '">' +
             (inCart ? "Añadido ✓" : "Añadir") + "</button>" +
-          '<button class="gear-detail" data-info="' + m.id + '">Ficha</button>' +
+          (m.unidades ? '<span class="gear-stock">' + m.unidades + " ud.</span>" : "") +
         "</div>" +
       "</div></article>";
   }
@@ -80,7 +81,7 @@
     var q = state.q.trim().toLowerCase();
     var list = R.material.filter(function (m) {
       var okCat = state.cat === "todos" || m.categoria === state.cat;
-      var okQ = !q || (m.nombre + " " + m.marca + " " + m.modelo + " " + m.incluye).toLowerCase().indexOf(q) > -1;
+      var okQ = !q || (m.nombre + " " + m.codigo + " " + m.notas).toLowerCase().indexOf(q) > -1;
       return okCat && okQ;
     });
     grid.innerHTML = list.map(gearCard).join("") ||
@@ -185,7 +186,7 @@
       return '<div class="cart-item">' +
         '<div class="cart-item-info">' +
           "<strong>" + String(m.nombre).replace(/</g, "&lt;") + "</strong>" +
-          "<span>" + (m.marca || "Marca por confirmar") + "</span>" +
+          "<span>" + (m.codigo || "") + "</span>" +
           '<div class="qty">' +
             '<button data-dec="' + i.id + '" aria-label="Quitar una unidad">−</button>' +
             "<b>" + i.qty + "</b>" +
@@ -213,15 +214,13 @@
     var cat = (R.categorias.filter(function (c) { return c.id === m.categoria; })[0] || {}).nombre || "";
     var pend = function (v) { return v ? String(v).replace(/</g, "&lt;") : '<span class="pending">Por confirmar</span>'; };
     document.getElementById("info-box").innerHTML =
-      '<p class="m-cat">' + cat + "</p>" +
+      '<p class="m-cat">' + cat + " · " + m.codigo + "</p>" +
       "<h3>" + String(m.nombre).replace(/</g, "&lt;") + "</h3>" +
+      (m.foto ? '<img src="' + m.foto + '" alt="" style="width:100%;margin-top:1.2rem;border:0.5px solid var(--faint)">' : "") +
       "<dl>" +
-        "<div><dt>Marca</dt><dd>" + pend(m.marca) + "</dd></div>" +
-        "<div><dt>Modelo</dt><dd>" + pend(m.modelo) + "</dd></div>" +
-        "<div><dt>Potencia</dt><dd>" + pend(m.potencia) + "</dd></div>" +
-        "<div><dt>Qué incluye</dt><dd>" + pend(m.incluye) + "</dd></div>" +
+        "<div><dt>Qué incluye</dt><dd>" + pend(m.notas) + "</dd></div>" +
         "<div><dt>Unidades disponibles</dt><dd>" + pend(m.unidades) + "</dd></div>" +
-        (m.nota ? "<div><dt>Notas</dt><dd>" + String(m.nota).replace(/</g, "&lt;") + "</dd></div>" : "") +
+        "<div><dt>Código</dt><dd>" + m.codigo + "</dd></div>" +
       "</dl>" +
       '<div class="modal-actions">' +
         '<button class="btn btn-primary btn-sm" id="info-add">Añadir a la solicitud</button>' +
@@ -266,7 +265,7 @@
     lines.push("Material solicitado:");
     items.forEach(function (i) {
       var m = findItem(i.id) || { nombre: i.id };
-      lines.push("  · " + i.qty + " × " + m.nombre + (m.marca ? " (" + m.marca + ")" : ""));
+      lines.push("  · " + i.qty + " × " + m.nombre + (m.codigo ? " [" + m.codigo + "]" : ""));
     });
     if (!items.length) lines.push("  (sin material seleccionado)");
     if (f.notas) { lines.push(""); lines.push("Notas: " + f.notas); }
