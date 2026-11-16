@@ -120,13 +120,18 @@ def main():
     ap.add_argument("--force", action="store_true", help="regenera los que ya existen")
     ap.add_argument("--dur", type=int, default=7, help="segundos de clip (7)")
     ap.add_argument("--ancho", type=int, default=960, help="ancho en px (960)")
+    ap.add_argument("--alto", type=int, default=0, help="alto máximo en px (por defecto 9/16 del ancho)")
     ap.add_argument("--crf", type=int, default=21, help="calidad x264, menos = mejor (21)")
     ap.add_argument("--local", metavar="CARPETA",
                     help="usa los vídeos originales de esta carpeta en vez de YouTube")
     args = ap.parse_args()
+    # encaja dentro de una caja ancho x alto sin deformar (los originales
+    # pueden ser 16:9, 4:3 o cinemascope) y sin pasar de 720 px de alto
+    alto = args.alto or int(round(args.ancho * 9 / 16))
     ffmpeg_filtro = (
-        "scale=%d:-2:flags=lanczos,unsharp=5:5:0.7:5:5:0.0" % args.ancho
-    )
+        "scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,"
+        "scale=trunc(iw/2)*2:trunc(ih/2)*2,unsharp=5:5:0.6:5:5:0.0"
+    ) % (args.ancho, alto)
 
     ff = ffmpeg()
     os.makedirs(SALIDA, exist_ok=True)
