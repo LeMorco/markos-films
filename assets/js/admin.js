@@ -194,13 +194,19 @@
     toast("Comprobando el servidor…");
     try {
       var d = await api("diagnostico");
+      var token = d.token || {};
+      var lineasToken = token.presente
+        ? "token " + token.formato + " · " + token.longitud + " caracteres" +
+          (token.conEspacios ? " · con espacios o comillas" : "")
+        : "sin token";
       var lineas = d.pruebas
         .map(function (p) {
           return (p.estado === "ok" ? "✓ " : "✕ ") + p.fichero + " · " + p.estado +
             (p.bytes ? " · " + p.bytes + " B" : "") + (p.detalle ? " · " + p.detalle : "");
         })
         .join("\n");
-      toast(d.origen + " · " + d.repo + " · rama " + d.rama + "\n" + lineas,
+      toast(
+        d.origen + " · " + d.repo + " · rama " + d.rama + "\n" + lineasToken + "\n" + lineas,
         d.pruebas.every(function (p) { return p.estado === "ok"; }) ? "ok" : "error");
     } catch (error) {
       toast("Diagnóstico: " + error.message, "error");
@@ -220,9 +226,25 @@
 
   async function cargarTodo() {
     aviso("Cargando…");
-    estado = await api("load");
-    pintarTodo();
-    marcarLimpio("");
+    try {
+      estado = await api("load");
+      pintarTodo();
+      if (estado.errores && estado.errores.length) {
+        marcarLimpio("No se pudo leer el contenido", "error");
+        toast(
+          "El panel no puede leer los datos del repositorio:\n" +
+            estado.errores.join("\n") +
+            "\nPulsa «Diagnóstico» para ver el detalle.",
+          "error"
+        );
+      } else {
+        marcarLimpio("");
+      }
+    } catch (error) {
+      estado = null;
+      marcarLimpio("No se pudo cargar", "error");
+      toast("No se pudo cargar el contenido:\n" + error.message, "error");
+    }
   }
 
   function pintarTodo() {
@@ -598,7 +620,10 @@
   /* --------------------------------- guardado --------------------------------- */
 
   async function guardar(fichero) {
-    if (!estado) return;
+    if (!estado) {
+      toast("Todavía no se han cargado los datos. Revisa el diagnóstico.", "error");
+      return;
+    }
     var cuerpo;
     if (fichero === "proyectos") {
       cuerpo = {

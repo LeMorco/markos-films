@@ -53,7 +53,27 @@ const intentos = new Map();
 /* ------------------------------ utilidades ------------------------------ */
 
 function env(nombre) {
-  return (process.env[nombre] || "").trim();
+  return String(process.env[nombre] || "")
+    .trim()
+    .replace(/^["'`]|["'`]$/g, "")
+    .trim();
+}
+
+/* datos del token sin revelarlo: sirve para detectar el error típico al pegarlo */
+function infoToken() {
+  const t = token();
+  if (!t) return { presente: false };
+  return {
+    presente: true,
+    formato: t.indexOf("github_pat_") === 0
+      ? "fine-grained"
+      : t.indexOf("ghp_") === 0
+        ? "clásico"
+        : "desconocido",
+    longitud: t.length,
+    conEspacios: t !== String(process.env.GITHUB_TOKEN || ""),
+    empiezaPor: t.slice(0, 4) + "…"
+  };
 }
 
 function usuarioEsperado() {
@@ -210,6 +230,19 @@ async function leerFichero(ruta) {
     }
   });
   if (r.status === 404) return { texto: "", sha: null, existe: false };
+  if (r.status === 401) {
+    throw new Error(
+      "GitHub rechaza el token (401). Comprueba GITHUB_TOKEN en Vercel: " +
+      "que esté completo, sin comillas ni espacios y sin caducar. " +
+      "Pulsa «Diagnóstico» para ver más detalle."
+    );
+  }
+  if (r.status === 403) {
+    throw new Error(
+      "GitHub no da permiso a ese token (403). Necesita Contents: Read and write " +
+      "sobre " + repo() + "."
+    );
+  }
   if (!r.ok) throw new Error("GitHub " + r.status + " al leer " + ruta);
   const datos = await r.json();
   return {
@@ -399,10 +432,19 @@ function serializarJs(fuente, marca, valor) {
 }
 
 async function cargar() {
+  const errores = [];
+  const leer = async (ruta) => {
+    try {
+      return await leerFichero(ruta);
+    } catch (error) {
+      errores.push(String(error.message));
+      return { texto: "", sha: null, existe: false };
+    }
+  };
   const [proyectos, material, textos] = await Promise.all([
-    leerFichero(FICHEROS.proyectos.ruta),
-    leerFichero(FICHEROS.material.ruta),
-    leerFichero(FICHEROS.textos.ruta)
+    leer(FICHEROS.proyectos.ruta),
+    leer(FICHEROS.material.ruta),
+    leer(FICHEROS.textos.ruta)
   ]);
 
   const markos = extraerJs(proyectos.texto, FICHEROS.proyectos.marca) || {};
@@ -417,6 +459,7 @@ async function cargar() {
   }
 
   return {
+    errores,
     proyectos: {
       datos: markos.proyectos || [],
       general: {
@@ -561,6 +604,7 @@ module.exports = async function handler(req, res) {
         origen: env("ADMIN_LOCAL_ROOT") ? "disco local" : "GitHub",
         repo: repo(),
         rama: rama(),
+        token: infoToken(),
         pruebas
       });
     }
