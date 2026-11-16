@@ -19,30 +19,57 @@
   var state = { cat: "todos", q: "" };
 
   /* ---------------- cesta ---------------- */
-  function read() {
-    try { return JSON.parse(localStorage.getItem(CART_KEY) || "[]"); } catch (e) { return []; }
-  }
-  function write(items) {
-    localStorage.setItem(CART_KEY, JSON.stringify(items));
-    paint();
-    if (window.MARKOS_CART) window.MARKOS_CART.paint();
-  }
   function findItem(id) {
     return R.material.filter(function (m) { return m.id === id; })[0];
   }
+  /* unidades disponibles: null o 0 = sin límite publicado (a consultar) */
+  function stockOf(id) {
+    var m = findItem(id);
+    return (m && typeof m.unidades === "number" && m.unidades > 0) ? m.unidades : Infinity;
+  }
+  function clampQty(id, qty) {
+    return Math.min(stockOf(id), Math.max(0, qty));
+  }
+  /* la cesta nunca guarda más unidades de las que hay */
+  function normalizar(items) {
+    return items.map(function (i) {
+      return { id: i.id, qty: clampQty(i.id, i.qty || 0) };
+    }).filter(function (i) { return i.qty > 0; });
+  }
+  function read() {
+    var items;
+    try { items = JSON.parse(localStorage.getItem(CART_KEY) || "[]"); } catch (e) { items = []; }
+    if (!Array.isArray(items)) items = [];
+    var norm = normalizar(items);
+    if (JSON.stringify(norm) !== JSON.stringify(items)) {
+      try { localStorage.setItem(CART_KEY, JSON.stringify(norm)); } catch (e) {}
+    }
+    return norm;
+  }
+  function write(items) {
+    var norm = normalizar(items);
+    localStorage.setItem(CART_KEY, JSON.stringify(norm));
+    paint();
+    if (window.MARKOS_CART) window.MARKOS_CART.paint();
+  }
+  /* devuelve false si ya se había alcanzado el máximo disponible */
   function add(id) {
     var items = read();
+    var max = stockOf(id);
     var cur = items.filter(function (i) { return i.id === id; })[0];
+    var qty = cur ? cur.qty : 0;
+    if (qty >= max) return false;
     if (cur) cur.qty += 1;
     else items.push({ id: id, qty: 1 });
     write(items);
+    return true;
   }
   function setQty(id, delta) {
     var items = read();
     items.forEach(function (i) {
-      if (i.id === id) i.qty = Math.max(0, i.qty + delta);
+      if (i.id === id) i.qty = clampQty(id, i.qty + delta);
     });
-    write(items.filter(function (i) { return i.qty > 0; }));
+    write(items);
   }
   function removeItem(id) {
     write(read().filter(function (i) { return i.id !== id; }));
@@ -53,7 +80,6 @@
 
   /* ---------------- render catálogo ---------------- */
   function gearCard(m, idx) {
-    var inCart = read().some(function (i) { return i.id === m.id; });
     var cat = (R.categorias.filter(function (c) { return c.id === m.categoria; })[0] || {}).nombre || "";
     var spec = m.notas || "Ficha pendiente";
 
@@ -70,8 +96,7 @@
         '<h3 class="gear-name">' + String(m.nombre).replace(/</g, "&lt;") + "</h3>" +
         '<p class="gear-spec">' + spec.replace(/</g, "&lt;") + "</p>" +
         '<div class="gear-foot">' +
-          '<button class="gear-add' + (inCart ? " added" : "") + '" data-add="' + m.id + '">' +
-            (inCart ? "Añadido ✓" : "Añadir") + "</button>" +
+          '<button class="gear-add" type="button" data-add="' + m.id + '">Añadir</button>' +
           (m.unidades ? '<span class="gear-stock">' + m.unidades + " ud.</span>" : "") +
         "</div>" +
       "</div></article>";
@@ -88,6 +113,33 @@
       '<p class="rent-empty">No hay material que coincida con la búsqueda.</p>';
     if (countEl) countEl.textContent = list.length;
     paintChips();
+    pintarBotones();
+  }
+
+  /* estado de cada botón "Añadir" según lo que ya hay en la cesta y el
+     stock real: al llegar al máximo se deshabilita */
+  function pintarBotones() {
+    var items = read();
+    var mapa = {};
+    items.forEach(function (i) { mapa[i.id] = i.qty; });
+    grid.querySelectorAll("[data-add]").forEach(function (b) {
+      var id = b.dataset.add;
+      var q = mapa[id] || 0;
+      var max = stockOf(id);
+      var lleno = q >= max;
+      b.classList.toggle("added", q > 0);
+      b.classList.toggle("is-max", lleno);
+      b.disabled = lleno;
+      if (lleno) {
+        b.textContent = max === 1 ? "Añadido ✓" : "Máximo (" + max + ")";
+        b.setAttribute("title", max === 1
+          ? "Solo hay una unidad y ya está en la solicitud"
+          : "Ya tienes las " + max + " unidades disponibles");
+      } else {
+        b.textContent = q > 0 ? "Añadir ✓" : "Añadir";
+        b.removeAttribute("title");
+      }
+    });
   }
 
   function paintChips() {
@@ -129,9 +181,7 @@
   grid.addEventListener("click", function (e) {
     var a = e.target.closest("[data-add]");
     if (a) {
-      add(a.dataset.add);
-      a.classList.add("added");
-      a.textContent = "Añadido ✓";
+      if (!add(a.dataset.add)) return;   // ya está al máximo
       openCart(true);
       return;
     }
@@ -176,6 +226,7 @@
       badge.textContent = items.length;
       badge.dataset.empty = items.length === 0 ? "true" : "false";
     }
+    pintarBotones();
     if (!itemsEl) return;
     if (!items.length) {
       itemsEl.innerHTML = '<p class="cart-empty">Todavía no has seleccionado material.<br>Añade equipos del catálogo y podrás enviar la solicitud de presupuesto con todo incluido.</p>';
@@ -183,14 +234,22 @@
     }
     itemsEl.innerHTML = items.map(function (i) {
       var m = findItem(i.id) || { nombre: i.id };
+      var max = stockOf(i.id);
+      var tope = i.qty >= max;
+      var miniatura = m.foto
+        ? '<img src="' + m.foto + '" alt="" loading="lazy" decoding="async">'
+        : '<span class="cart-item-sincodigo">' + (m.codigo || "") + "</span>";
       return '<div class="cart-item">' +
+        '<div class="cart-item-thumb">' + miniatura + "</div>" +
         '<div class="cart-item-info">' +
           "<strong>" + String(m.nombre).replace(/</g, "&lt;") + "</strong>" +
-          "<span>" + (m.codigo || "") + "</span>" +
+          "<span>" + (m.codigo || "") +
+            (isFinite(max) ? " · máx. " + max : "") + "</span>" +
           '<div class="qty">' +
             '<button data-dec="' + i.id + '" aria-label="Quitar una unidad">−</button>' +
             "<b>" + i.qty + "</b>" +
-            '<button data-inc="' + i.id + '" aria-label="Añadir una unidad">+</button>' +
+            '<button data-inc="' + i.id + '" aria-label="Añadir una unidad"' +
+              (tope ? ' disabled aria-disabled="true" title="No hay más unidades disponibles"' : "") + ">+</button>" +
             '<button data-del="' + i.id + '" aria-label="Quitar del listado" style="margin-left:auto">✕</button>' +
           "</div>" +
         "</div></div>";
@@ -213,6 +272,10 @@
     if (!m || !info) return;
     var cat = (R.categorias.filter(function (c) { return c.id === m.categoria; })[0] || {}).nombre || "";
     var pend = function (v) { return v ? String(v).replace(/</g, "&lt;") : '<span class="pending">Por confirmar</span>'; };
+    var max = stockOf(id);
+    var enCesta = read().filter(function (i) { return i.id === id; })[0];
+    var qty = enCesta ? enCesta.qty : 0;
+    var tope = qty >= max;
     document.getElementById("info-box").innerHTML =
       '<p class="m-cat">' + cat + " · " + m.codigo + "</p>" +
       "<h3>" + String(m.nombre).replace(/</g, "&lt;") + "</h3>" +
@@ -220,16 +283,20 @@
       "<dl>" +
         "<div><dt>Qué incluye</dt><dd>" + pend(m.notas) + "</dd></div>" +
         "<div><dt>Unidades disponibles</dt><dd>" + pend(m.unidades) + "</dd></div>" +
+        "<div><dt>En tu solicitud</dt><dd>" + qty + (isFinite(max) ? " de " + max : "") + "</dd></div>" +
         "<div><dt>Código</dt><dd>" + m.codigo + "</dd></div>" +
       "</dl>" +
       '<div class="modal-actions">' +
-        '<button class="btn btn-primary btn-sm" id="info-add">Añadir a la solicitud</button>' +
+        '<button class="btn btn-primary btn-sm" id="info-add"' +
+          (tope ? ' disabled aria-disabled="true"' : "") + ">" +
+          (tope ? (max === 1 ? "Ya está en la solicitud" : "Máximo alcanzado (" + max + ")") : "Añadir a la solicitud") +
+        "</button>" +
         '<button class="btn btn-sm" data-info-close>Cerrar</button>' +
       "</div>";
     info.classList.add("open");
     var btn = document.getElementById("info-add");
-    if (btn) btn.addEventListener("click", function () {
-      add(id);
+    if (btn && !tope) btn.addEventListener("click", function () {
+      if (!add(id)) return;
       closeInfo();
       openCart(true);
     });
