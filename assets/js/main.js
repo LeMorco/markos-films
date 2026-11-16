@@ -104,22 +104,77 @@
       if (isNaN(inicio) || inicio < 0) inicio = 15;
       var timer = null;
       var frame = null;
-      var golpes = [];
+      var temporizadores = [];
       var oyente = null;
+      var revelado = false;
+      var escuchando = false;
+      var pings = 0;
+      var ultimoPlay = 0;
+      var estadoAnterior = -2;
+
+      /* YouTube pinta su interfaz (titulo, boton de pausa, "Mas videos",
+         logo) durante los primeros segundos aunque se pase controls=0, y
+         no hay ningun parametro que la desactive: lo unico que funciona es
+         esperar a que el reproductor la retire sola. Hasta entonces el
+         iframe se queda oculto y se ve la miniatura de la tarjeta. */
+      var ESPERA_INTERFAZ = 5500;
+
+      function programar(fn, ms) {
+        temporizadores.push(setTimeout(fn, ms));
+      }
 
       /* control del reproductor por postMessage (YouTube IFrame API) */
-      function mandar(func) {
+      function mandar(func, args) {
         if (!frame) return;
         try {
           frame.contentWindow.postMessage(
-            JSON.stringify({ event: "command", func: func, args: [] }), "*"
+            JSON.stringify({ event: "command", func: func, args: args || [] }), "*"
           );
         } catch (e) {}
       }
 
-      /* YouTube pausa el embed en algunos casos (autoplay bloqueado,
-         cambio de pestaña, sugerencia al final del clip). Al detectar la
-         pausa se vuelve a arrancar: así nunca queda el icono de pausa. */
+      function revelar() {
+        if (revelado || !frame) return;
+        revelado = true;
+        frame.classList.add("visible");
+      }
+
+      function quitarSubtitulos() {
+        mandar("unloadModule", ["captions"]);
+        mandar("setOption", ["captions", "track", {}]);
+      }
+
+      /* El reproductor solo empieza a informar de su estado cuando recibe
+         el evento "listening", y ese primer envio se pierde si el player
+         aun no esta listo: se insiste hasta que contesta. */
+      function pedirEstado() {
+        if (!frame || escuchando || pings > 40) return;
+        pings++;
+        try {
+          frame.contentWindow.postMessage(
+            JSON.stringify({ event: "listening", id: id }), "*"
+          );
+        } catch (e) {}
+        programar(pedirEstado, 400);
+      }
+
+      function alEstado(estado) {
+        escuchando = true;
+        if (estado === estadoAnterior) return;
+        estadoAnterior = estado;
+        if (estado === 1) {
+          /* reproduciendo: fuera subtitulos automaticos */
+          quitarSubtitulos();
+        } else if (estado === 0 || estado === 2) {
+          /* 0 = terminado, 2 = en pausa: se vuelve a arrancar */
+          var ahora = Date.now();
+          if (ahora - ultimoPlay > 900) {
+            ultimoPlay = ahora;
+            mandar("playVideo");
+          }
+        }
+      }
+
       function vigilar(win) {
         if (oyente) window.removeEventListener("message", oyente);
         oyente = function (e) {
@@ -128,9 +183,18 @@
           if (typeof dato === "string") {
             try { dato = JSON.parse(dato); } catch (err) { return; }
           }
-          if (!dato || dato.event !== "onStateChange") return;
-          /* 0 = terminado, 2 = en pausa, 5 = cargado sin arrancar */
-          if (dato.info === 0 || dato.info === 2 || dato.info === 5) mandar("playVideo");
+          if (!dato) return;
+          /* el estado llega de tres formas segun el canal del reproductor:
+             onStateChange -> info = numero
+             infoDelivery -> info.playerState
+             infoDelivery -> infoDelivery.playerState */
+          if (dato.event === "onStateChange" && typeof dato.info === "number") {
+            alEstado(dato.info);
+          } else if (dato.info && typeof dato.info.playerState === "number") {
+            alEstado(dato.info.playerState);
+          } else if (dato.infoDelivery && typeof dato.infoDelivery.playerState === "number") {
+            alEstado(dato.infoDelivery.playerState);
+          }
         };
         window.addEventListener("message", oyente);
       }
@@ -153,35 +217,27 @@
           "&fs=0&showinfo=0&cc_load_policy=0&autohide=1&enablejsapi=1" +
           "&start=" + inicio +
           (origen ? "&origin=" + encodeURIComponent(origen) : "");
-        var win = null;
-        frame.addEventListener("load", function () {
-          if (!frame) return;
-          win = frame.contentWindow;
-          frame.classList.add("visible");
-          vigilar(win);
-          /* handshake de la IFrame API: sin esto el reproductor no envía
-             onReady / onStateChange a la página */
-          try {
-            frame.contentWindow.postMessage(
-              JSON.stringify({ event: "listening", id: id }), "*"
-            );
-          } catch (e) {}
-          /* varios intentos: el reproductor tarda en estar listo y a veces
-             ignora el primero (autoplay bloqueado o buffering) */
-          mandar("mute");
-          mandar("playVideo");
-          golpes = [300, 900, 1800, 3200].map(function (ms) {
-            return setTimeout(function () { mandar("playVideo"); }, ms);
-          });
-        });
         card.appendChild(frame);
-        previewActivo = { card: card, cerrar: descargar, reanudar: function () { mandar("playVideo"); } };
+        /* el evento load de un iframe de YouTube puede tardar varios
+           segundos, asi que la escucha y los pings arrancan ya: el
+           WindowProxy del iframe no cambia al navegar */
+        vigilar(frame.contentWindow);
+        mandar("mute");
+        pedirEstado();
+        programar(revelar, ESPERA_INTERFAZ);
+        previewActivo = {
+          card: card,
+          cerrar: descargar,
+          reanudar: function () { mandar("playVideo"); }
+        };
       }
 
       function descargar() {
         clearTimeout(timer);
-        golpes.forEach(clearTimeout);
-        golpes = [];
+        temporizadores.forEach(clearTimeout);
+        temporizadores = [];
+        revelado = true;          // evita revelados pendientes
+        escuchando = true;        // corta la ronda de pings
         if (oyente) { window.removeEventListener("message", oyente); oyente = null; }
         if (previewActivo && previewActivo.card === card) previewActivo = null;
         if (!frame) return;
@@ -194,7 +250,7 @@
       }
 
       card.addEventListener("mouseenter", function () {
-        timer = setTimeout(cargar, 160);
+        timer = setTimeout(cargar, 80);
       });
       card.addEventListener("mouseleave", descargar);
       card.addEventListener("focusout", descargar);
