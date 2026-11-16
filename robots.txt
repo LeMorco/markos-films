@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://markos-films.vercel.app/sitemap.xml

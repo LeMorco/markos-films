@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel · Marcos Donate</title>
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="theme-color" content="#050A08">
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body class="admin">
+
+<!-- ------------------------------- acceso ------------------------------- -->
+<section id="pantalla-acceso" class="acceso">
+  <div class="acceso-caja">
+    <p class="label">Marcos Donate</p>
+    <h1>Panel de edición</h1>
+    <p class="acceso-texto">Entra para modificar proyectos, el catálogo de alquiler y los textos de la web. Los cambios se publican solos en un minuto.</p>
+
+    <form id="form-login" autocomplete="on">
+      <div class="campo">
+        <label for="usuario">Usuario</label>
+        <input id="usuario" name="usuario" type="text" autocomplete="username" required>
+      </div>
+      <div class="campo">
+        <label for="clave">Contraseña</label>
+        <input id="clave" name="clave" type="password" autocomplete="current-password" required>
+      </div>
+      <button class="boton boton-principal" type="submit" id="btn-login">Entrar</button>
+      <p class="aviso" id="aviso-login" role="alert" hidden></p>
+    </form>
+    <p class="acceso-pie" id="estado-config" hidden></p>
+  </div>
+</section>
+
+<!-- ------------------------------- panel ------------------------------- -->
+<div id="app" hidden>
+  <div class="barra">
+    <div class="barra-titulo">
+      <span class="marca">Marcos Donate</span>
+      <span class="barra-sep">/</span>
+      <span class="barra-panel">Panel</span>
+    </div>
+    <div class="pestanas" role="tablist">
+      <button class="pestana activa" data-tab="proyectos" role="tab">Proyectos</button>
+      <button class="pestana" data-tab="material" role="tab">Material</button>
+      <button class="pestana" data-tab="textos" role="tab">Textos</button>
+      <button class="pestana" data-tab="ajustes" role="tab">Ajustes</button>
+    </div>
+    <div class="barra-acciones">
+      <span class="estado" id="estado-guardado"></span>
+      <a class="boton boton-plano" href="index.html" target="_blank" rel="noopener">Ver web</a>
+      <button class="boton boton-plano" id="btn-salir">Salir</button>
+    </div>
+  </div>
+
+  <main class="contenido">
+    <!-- proyectos -->
+    <section class="vista" data-vista="proyectos">
+      <div class="vista-cabecera">
+        <div>
+          <h2>Proyectos</h2>
+          <p class="ayuda">Cada ficha del portfolio. Los campos vacíos se muestran como «Por confirmar».</p>
+        </div>
+        <div class="vista-botones">
+          <button class="boton" id="btn-nuevo-proyecto">Añadir proyecto</button>
+          <button class="boton boton-principal" data-guardar="proyectos">Guardar proyectos</button>
+        </div>
+      </div>
+      <div id="lista-proyectos" class="lista"></div>
+    </section>
+
+    <!-- material -->
+    <section class="vista" data-vista="material" hidden>
+      <div class="vista-cabecera">
+        <div>
+          <h2>Catálogo de alquiler</h2>
+          <p class="ayuda">Las <strong>unidades</strong> son el stock real: la web no deja pedir más. Vacío = sin límite publicado.</p>
+        </div>
+        <div class="vista-botones">
+          <button class="boton" id="btn-nueva-referencia">Añadir referencia</button>
+          <button class="boton boton-principal" data-guardar="material">Guardar catálogo</button>
+        </div>
+      </div>
+      <div class="buscador">
+        <input id="filtro-material" type="search" placeholder="Buscar por nombre, código o nota…">
+        <span class="buscador-cuenta" id="cuenta-material"></span>
+      </div>
+      <div id="lista-material" class="lista"></div>
+    </section>
+
+    <!-- textos -->
+    <section class="vista" data-vista="textos" hidden>
+      <div class="vista-cabecera">
+        <div>
+          <h2>Textos de las páginas</h2>
+          <p class="ayuda">Los literales fijos de la web. Se aplican al cargar cada página.</p>
+        </div>
+        <div class="vista-botones">
+          <button class="boton boton-principal" data-guardar="textos">Guardar textos</button>
+        </div>
+      </div>
+      <div id="lista-textos" class="lista"></div>
+    </section>
+
+    <!-- ajustes -->
+    <section class="vista" data-vista="ajustes" hidden>
+      <div class="vista-cabecera">
+        <div>
+          <h2>Datos generales</h2>
+          <p class="ayuda">Nombre, oficio y contacto que aparecen en el pie y en los correos.</p>
+        </div>
+        <div class="vista-botones">
+          <button class="boton boton-principal" data-guardar="proyectos">Guardar</button>
+        </div>
+      </div>
+      <div id="lista-ajustes" class="lista"></div>
+      <div class="nota-final">
+        <h3>Publicación</h3>
+        <p>Al guardar se hace un commit en GitHub y Vercel republica la web en unos 60 segundos. Si algo sale mal, cualquier cambio se puede revertir desde GitHub (historial de commits).</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="assets/js/admin.js"></script>
+</body>
+</html>

@@ -17,7 +17,7 @@ Uso:
     # a partir de los vídeos originales en tools/maestros/
     python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19
 
-    # descargando de YouTube
+    # descargando de YouTube (hasta 1080p)
     python tools/make_previews.py              # solo los que faltan
     python tools/make_previews.py --force      # regenera todos
     python tools/make_previews.py --dur 6      # otra duración
@@ -33,19 +33,11 @@ import subprocess
 import sys
 import tempfile
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from yt import descargar, ffmpeg
+
 RAIZ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SALIDA = os.path.join(RAIZ, "assets", "video", "preview")
-
-
-def ffmpeg():
-    try:
-        import imageio_ffmpeg
-        return imageio_ffmpeg.get_ffmpeg_exe()
-    except ImportError:
-        ruta = shutil.which("ffmpeg")
-        if not ruta:
-            sys.exit("Falta ffmpeg: pip install imageio-ffmpeg")
-        return ruta
 
 
 def proyectos():
@@ -155,17 +147,11 @@ def main():
             print("   origen:", os.path.basename(origen))
         else:
             base = os.path.join(tmp, vid)
-            r = subprocess.run([
-                sys.executable, "-m", "yt_dlp",
-                "--extractor-args", "youtube:player_client=android",
-                "-f", "b[height<=480]/b", "-o", base + ".%(ext)s",
-                "https://www.youtube.com/watch?v=" + vid,
-            ])
-            ficheros = [f for f in os.listdir(tmp) if f.startswith(vid + ".")]
-            if r.returncode != 0 or not ficheros:
+            origen, _, alto = descargar("https://www.youtube.com/watch?v=" + vid, base)
+            if not origen:
                 print("   error al descargar, se omite")
                 continue
-            origen = os.path.join(tmp, ficheros[0])
+            print("   descargado: %dp" % alto)
             descargado = True
         if inicio is None:
             inicio = mejor_inicio(brillo_por_segundo(ff, origen), args.dur)

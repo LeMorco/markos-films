@@ -16,7 +16,7 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 ## Movimiento e interacción
 
 - **Portadas rotatorias** en el inicio (5 fotogramas, 4 s cada uno, con barras de progreso clicables y pausa al pasar el ratón).
-- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. Al salir se descarga. Para añadir un proyecto nuevo, ejecuta `python tools/make_previews.py` (ver cabecera del script). Si tienes los vídeos originales en buena calidad, déjalos en `tools/maestros/` (nombre con el slug o el id de YouTube) y genera los clips desde ahí, sin pasar por YouTube: `python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19`. Esa carpeta está en `.gitignore`. Para un proyecto suelto hay un atajo que hace todo (descarga el original hasta 1080p, elige el tramo, corta el clip y publica): `python tools/add_preview.py https://youtu.be/<id>`; ver la cabecera de `tools/add_preview.py` para opciones (`--inicio`, `--guardar-master`, `--cookies-file` si YouTube bloquea la descarga).
+- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. Al salir se descarga. Para añadir un proyecto nuevo, ejecuta `python tools/make_previews.py` (ver cabecera del script). Si tienes los vídeos originales en buena calidad, déjalos en `tools/maestros/` (nombre con el slug o el id de YouTube) y genera los clips desde ahí, sin pasar por YouTube: `python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19`. Esa carpeta está en `.gitignore`. Para uno o varios proyectos sueltos hay un atajo que hace todo (descarga cada original hasta 1080p en H.264, elige el tramo, corta el clip mudo y lo publica): `python tools/add_preview.py <url> [<url> ...]`. Si el vídeo todavía no está en `data.js`, deduce el slug a partir del título y te recuerda añadir la ficha. Opciones útiles: `--inicio 42` fija el segundo del clip, `--guardar-master` deja también el vídeo completo en `tools/maestros/` (no va al repo), `--no-push` corta el clip sin publicar y `--cookies-file cookies.txt` si YouTube pide sesión. La descarga va con una sola conexión porque YouTube devuelve 403 al pedir fragmentos en paralelo sin sesión.
 - **Revelado tipográfico**: los titulares suben desde una máscara al entrar en pantalla.
 - **Parallax** suave en las portadas del grid (solo escritorio).
 - **Scroll con inercia** en ratón/trackpad + **barra de progreso** en el borde derecho.
@@ -31,6 +31,41 @@ Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el
 - **`assets/js/rental.js`** — catálogo: categorías y las 42 piezas con código, unidades y ficha.
 - **`assets/img/material/`** — foto de cada pieza, nombrada con su código (`A001.jpg`…).
 - **`api/solicitud.js`** — función serverless que envía las solicitudes por Resend.
+
+## Panel de edición (`/admin`)
+
+Página privada para cambiar el contenido sin tocar código: proyectos, catálogo de alquiler, textos fijos de las páginas y datos de contacto. Cada guardado es un commit en GitHub, así que Vercel republica la web en ~60 s y todo queda en el historial (se puede revertir desde GitHub).
+
+- `admin.html` — interfaz (login, pestañas de Proyectos, Material, Textos y Ajustes).
+- `assets/js/admin.js` — formularios y llamadas al panel.
+- `api/admin.js` — función serverless: sesión firmada por cookie, validación y commit vía API de GitHub. El token y la contraseña viven en el servidor, nunca en el navegador.
+- `content/textos.json` — literales editables; `assets/js/textos.js` los aplica sobre los elementos con `data-txt` al cargar cada página.
+
+### Configuración (una sola vez, en Vercel)
+
+Settings → Environment Variables:
+
+| Variable | Obligatoria | Para qué |
+|---|---|---|
+| `ADMIN_PASSWORD` | sí | contraseña del panel |
+| `GITHUB_TOKEN` | sí | token con permiso **Contents: Read and write** sobre el repo |
+| `ADMIN_USER` | no | usuario; por defecto `marcos` |
+| `SESSION_SECRET` | no | secreto para firmar la cookie de sesión (si falta se usa la contraseña) |
+| `GITHUB_REPO` | no | por defecto `LeMorco/markos-films` |
+| `GITHUB_BRANCH` | no | por defecto `main` |
+
+Después de añadirlas hay que **redesplegar** para que la función las vea. La sesión dura 8 horas y hay límite de intentos por IP.
+
+### Probar en local
+
+Sin token se puede probar contra el disco:
+
+```
+ADMIN_LOCAL_ROOT=$PWD ADMIN_PASSWORD=prueba node tools/devserver.js
+# y en otra terminal: ver README de tools o usar `vercel dev`
+```
+
+Con `ADMIN_LOCAL_ROOT` el panel lee y escribe los ficheros del repo en lugar de hacer commits.
 
 ## Cómo funciona la solicitud de presupuesto
 
