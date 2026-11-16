@@ -58,8 +58,10 @@
   }
   function cardHTML(p) {
     var t = thumb(p);
+    var attrs = ' data-yt="' + (p.youtube || "") + '" data-slug="' + esc(p.slug) +
+      '" data-start="' + (p.preview || 15) + '"';
     if (!t) {
-      return '<a class="card no-img" href="proyecto.html?p=' + encodeURIComponent(p.slug) + '">' +
+      return '<a class="card no-img" href="proyecto.html?p=' + encodeURIComponent(p.slug) + '"' + attrs + '>' +
         '<div class="card-body">' +
           '<span class="card-type">' + esc(tipoLabel(p.tipo)) + "</span>" +
           '<span class="card-title">' + esc(p.titulo) + "</span>" +
@@ -67,13 +69,75 @@
         "</div></a>";
     }
     var inner =
-      '<img src="' + t + '" alt="' + esc(p.titulo) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://i.ytimg.com/vi/' + p.youtube + '/hqdefault.jpg\'">' +
+      '<div class="card-media">' +
+        '<img src="' + t + '" alt="' + esc(p.titulo) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://i.ytimg.com/vi/' + p.youtube + '/hqdefault.jpg\'">' +
+      "</div>" +
       '<div class="card-body">' +
         '<span class="card-type">' + esc(tipoLabel(p.tipo)) + "</span>" +
         '<span class="card-title">' + esc(p.titulo) + "</span>" +
         (p.artista ? '<span class="card-client">' + esc(artistaCorto(p)) + "</span>" : "") +
       "</div>";
-    return '<a class="card" href="proyecto.html?p=' + encodeURIComponent(p.slug) + '">' + inner + "</a>";
+    return '<a class="card" href="proyecto.html?p=' + encodeURIComponent(p.slug) + '"' + attrs + '>' + inner + "</a>";
+  }
+
+  /* ---------------- preview en vídeo al pasar el ratón ---------------- */
+  var previewActivo = null;
+  var puedePreview =
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
+    window.innerWidth > 900 &&
+    !(navigator.connection && navigator.connection.saveData) &&
+    !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function bindPreviews(root) {
+    if (!puedePreview || !root) return;
+    [].forEach.call(root.querySelectorAll(".card[data-yt]:not([data-preview])"), function (card) {
+      var id = card.dataset.yt;
+      if (!id) return;
+      card.dataset.preview = "1";
+      var inicio = parseInt(card.dataset.start, 10);
+      if (isNaN(inicio) || inicio < 0) inicio = 15;
+      var timer = null;
+      var frame = null;
+
+      function cargar() {
+        if (frame) return;
+        /* una sola preview activa a la vez */
+        if (previewActivo) previewActivo.cerrar();
+        frame = document.createElement("iframe");
+        frame.className = "card-preview";
+        frame.setAttribute("tabindex", "-1");
+        frame.setAttribute("aria-hidden", "true");
+        frame.setAttribute("title", "");
+        frame.allow = "autoplay; encrypted-media; picture-in-picture";
+        frame.src =
+          "https://www.youtube-nocookie.com/embed/" + id +
+          "?autoplay=1&mute=1&controls=0&loop=1&playlist=" + id +
+          "&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1&start=" + inicio;
+        frame.addEventListener("load", function () {
+          if (frame) frame.classList.add("visible");
+        });
+        card.appendChild(frame);
+        previewActivo = { card: card, cerrar: descargar };
+      }
+
+      function descargar() {
+        clearTimeout(timer);
+        if (previewActivo && previewActivo.card === card) previewActivo = null;
+        if (!frame) return;
+        var f = frame;
+        frame = null;
+        f.classList.remove("visible");
+        setTimeout(function () {
+          if (f.parentNode) f.parentNode.removeChild(f);
+        }, 520);
+      }
+
+      card.addEventListener("mouseenter", function () {
+        timer = setTimeout(cargar, 160);
+      });
+      card.addEventListener("mouseleave", descargar);
+      card.addEventListener("focusout", descargar);
+    });
   }
 
   /* ---------------- carrito: contador global ---------------- */
@@ -95,20 +159,20 @@
   /* ---------------- grid de proyectos ---------------- */
   var gridProy = document.getElementById("grid-proyectos");
   if (gridProy) {
-    var barra = document.getElementById("filtros-proyectos");
+    var barraFiltros = document.getElementById("filtros-proyectos");
     var inicial = (new URLSearchParams(location.search).get("tipo") || "todos").toLowerCase();
     var tipos = ["todos"].concat(PROYECTOS.map(function (p) { return p.tipo; })
       .filter(function (t, i, a) { return t && a.indexOf(t) === i; }));
 
-    if (barra) {
-      barra.innerHTML = tipos.map(function (t) {
+    if (barraFiltros) {
+      barraFiltros.innerHTML = tipos.map(function (t) {
         return '<button class="chip' + (t === inicial ? " active" : "") + '" data-tipo="' + t + '">' +
           (t === "todos" ? "Todos" : tipoLabel(t)) + "</button>";
       }).join("");
-      barra.addEventListener("click", function (e) {
+      barraFiltros.addEventListener("click", function (e) {
         var b = e.target.closest(".chip");
         if (!b) return;
-        barra.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("active"); });
+        barraFiltros.querySelectorAll(".chip").forEach(function (c) { c.classList.remove("active"); });
         b.classList.add("active");
         aplicar(b.dataset.tipo);
       });
@@ -119,13 +183,14 @@
       gridProy.innerHTML = lista.map(cardHTML).join("") ||
         '<p class="rent-empty">No hay proyectos en esta categoría.</p>';
       gridProy.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
+      bindPreviews(gridProy);
     }
     aplicar(inicial);
   }
 
   /* ---------------- destacados ---------------- */
   var destacados = document.getElementById("grid-destacados");
-  if (destacados) destacados.innerHTML = PROYECTOS.slice(0, 6).map(cardHTML).join("");
+  if (destacados) { destacados.innerHTML = PROYECTOS.slice(0, 6).map(cardHTML).join(""); bindPreviews(destacados); }
 
   /* ---------------- ficha de proyecto ---------------- */
   var page = document.getElementById("proyecto-page");
@@ -210,6 +275,7 @@
 
       var relGrid = document.getElementById("grid-relacionados");
       if (relGrid) relGrid.innerHTML = rel.map(cardHTML).join("");
+      if (relGrid) bindPreviews(relGrid);
     }
   }
 
@@ -284,4 +350,156 @@
     pintarHero(0);
     arrancarHero();
   }
+
+  /* ============================================================
+     Movimiento global: revelado tipográfico, parallax,
+     barra de progreso y scroll con inercia
+     ============================================================ */
+  var sinMovimiento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  /* ---------- revelado de titulares (máscara) ---------- */
+  var titulares = document.querySelectorAll(
+    ".hero h1, .page-head h1, .section-head h2, .proj-head h1, .about h1, .contact h1"
+  );
+  var maskObserver = null;
+  if (!sinMovimiento) {
+    maskObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add("mask-in"); maskObserver.unobserve(e.target); }
+      });
+    }, { threshold: 0.15, rootMargin: "0px 0px -8% 0px" });
+  }
+  [].forEach.call(titulares, function (h) {
+    if (h.dataset.mask === "1") return;
+    h.dataset.mask = "1";
+    h.innerHTML = '<span class="mask-inner">' + h.innerHTML + "</span>";
+    h.classList.add("mask");
+    if (sinMovimiento) { h.classList.add("mask-in"); return; }
+    var caja = h.getBoundingClientRect();
+    if (caja.top < window.innerHeight * 0.95) {
+      /* ya está en pantalla al cargar: se revela sin esperar al observer */
+      setTimeout(function () { h.classList.add("mask-in"); }, 60);
+    } else {
+      maskObserver.observe(h);
+    }
+  });
+
+  /* ---------- barra de progreso de scroll ---------- */
+  var barraProgreso = document.createElement("div");
+  barraProgreso.className = "scroll-progress";
+  barraProgreso.setAttribute("aria-hidden", "true");
+  barraProgreso.innerHTML = "<span></span>";
+  document.body.appendChild(barraProgreso);
+  var barraFill = barraProgreso.firstChild;
+
+  /* ---------- parallax en las portadas de proyecto ---------- */
+  var parallaxEls = [];
+  function refrescarParallax() {
+    parallaxEls = [].slice.call(document.querySelectorAll(".card-media"));
+  }
+  refrescarParallax();
+
+  var framePendiente = false;
+  function enFrame() {
+    framePendiente = false;
+
+    var alto = document.documentElement.scrollHeight - window.innerHeight;
+    var progreso = alto > 0 ? Math.min(1, Math.max(0, window.scrollY / alto)) : 1;
+    barraFill.style.transform = "scaleY(" + progreso.toFixed(4) + ")";
+
+    if (sinMovimiento) return;
+    if (window.innerWidth <= 900) return;
+    var vh = window.innerHeight;
+    for (var i = 0; i < parallaxEls.length; i++) {
+      var el = parallaxEls[i];
+      var caja = el.parentElement.getBoundingClientRect();
+      if (caja.bottom < -80 || caja.top > vh + 80) continue;
+      var centro = caja.top + caja.height / 2 - vh / 2;
+      var desplazamiento = (-centro / vh) * 16;
+      el.style.transform = "translate3d(0," + desplazamiento.toFixed(2) + "px,0)";
+    }
+  }
+  function pedirFrame() {
+    if (!framePendiente) { framePendiente = true; requestAnimationFrame(enFrame); }
+  }
+
+  window.addEventListener("scroll", pedirFrame, { passive: true });
+  window.addEventListener("resize", function () { refrescarParallax(); pedirFrame(); }, { passive: true });
+  document.addEventListener("proyectos-renderizados", refrescarParallax);
+  enFrame();
+  pedirFrame();
+
+  /* ---------- scroll con inercia (solo ratón/trackpad) ---------- */
+  var puedeInercia =
+    !sinMovimiento &&
+    window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
+    window.innerWidth > 900;
+
+  if (puedeInercia) {
+    var objetivo = window.scrollY;
+    var actual = window.scrollY;
+    var animando = false;
+    var SUAVIZADO = 0.14;
+
+    function tope() { return Math.max(0, document.documentElement.scrollHeight - window.innerHeight); }
+
+    function paso() {
+      actual += (objetivo - actual) * SUAVIZADO;
+      if (Math.abs(objetivo - actual) < 0.5) {
+        actual = objetivo;
+        animando = false;
+        window.scrollTo(0, actual);
+        return;
+      }
+      window.scrollTo(0, actual);
+      requestAnimationFrame(paso);
+    }
+
+    function arrancar() {
+      if (!animando) { animando = true; requestAnimationFrame(paso); }
+    }
+
+    window.addEventListener("wheel", function (e) {
+      if (e.ctrlKey) return;
+      if (document.body.style.overflow === "hidden") return;
+      var destino = e.target;
+      if (destino && destino.closest && destino.closest("[data-no-inercia], .cart-panel, .modal-box, .modal, .lightbox")) return;
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      var unidad = e.deltaMode === 1 ? 18 : e.deltaMode === 2 ? window.innerHeight : 1;
+      e.preventDefault();
+      if (!animando) { actual = objetivo = window.scrollY; }
+      objetivo = Math.min(tope(), Math.max(0, objetivo + e.deltaY * unidad));
+      arrancar();
+    }, { passive: false });
+
+    /* si el usuario usa teclado, barra o anclas, resincronizamos */
+    window.addEventListener("scroll", function () {
+      if (animando) {
+        /* alguien ha desplazado fuera de nuestro control (barra, teclado) */
+        if (Math.abs(window.scrollY - actual) > 2) {
+          animando = false;
+          actual = objetivo = window.scrollY;
+        }
+        return;
+      }
+      actual = objetivo = window.scrollY;
+    }, { passive: true });
+  }
+
+  /* ---------- transición de portada a ficha (View Transitions) ---------- */
+  if (document.startViewTransition) {
+    document.addEventListener("click", function (e) {
+      var card = e.target.closest(".card");
+      if (!card || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      var media = card.querySelector(".card-media") || card;
+      media.style.viewTransitionName = "proyecto-media";
+    });
+  }
+
+  /* avisar al parallax cuando se repinta un grid */
+  var observarGrids = new MutationObserver(function () { refrescarParallax(); pedirFrame(); });
+  ["grid-proyectos", "grid-destacados", "grid-relacionados"].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (el) observarGrids.observe(el, { childList: true });
+  });
 })();

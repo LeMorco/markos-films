@@ -13,6 +13,17 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 | `sobre-mi.html` | Texto pendiente de completar |
 | `contacto.html` | Email, Instagram y acceso al alquiler |
 
+## Movimiento e interacción
+
+- **Portadas rotatorias** en el inicio (5 fotogramas, 4 s cada uno, con barras de progreso clicables y pausa al pasar el ratón).
+- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): carga el fragmento de YouTube en silencio y lo descarga al salir.
+- **Revelado tipográfico**: los titulares suben desde una máscara al entrar en pantalla.
+- **Parallax** suave en las portadas del grid (solo escritorio).
+- **Scroll con inercia** en ratón/trackpad + **barra de progreso** en el borde derecho.
+- **Transición de página** con View Transitions: la portada del proyecto se expande hacia su ficha (Chrome/Edge); en el resto, navegación normal.
+
+Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el parallax, la inercia y las transiciones) y en móvil solo se mantiene lo esencial.
+
 ## Datos editables
 
 - **`assets/js/data.js`** — datos generales (nombre, email, Instagram) y proyectos.
