@@ -74,7 +74,12 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--force", action="store_true", help="regenera los que ya existen")
     ap.add_argument("--dur", type=int, default=7, help="segundos de clip (7)")
+    ap.add_argument("--ancho", type=int, default=960, help="ancho en px (960)")
+    ap.add_argument("--crf", type=int, default=21, help="calidad x264, menos = mejor (21)")
     args = ap.parse_args()
+    ffmpeg_filtro = (
+        "scale=%d:-2:flags=lanczos,unsharp=5:5:0.7:5:5:0.0" % args.ancho
+    )
 
     ff = ffmpeg()
     os.makedirs(SALIDA, exist_ok=True)
@@ -104,8 +109,9 @@ def main():
         r2 = subprocess.run([
             ff, "-y", "-loglevel", "error",
             "-ss", str(inicio), "-t", str(args.dur), "-i", origen,
-            "-an", "-vf", "scale=640:-2", "-c:v", "libx264", "-preset", "medium",
-            "-crf", "30", "-pix_fmt", "yuv420p", "-movflags", "+faststart", destino,
+            "-an", "-vf", ffmpeg_filtro, "-c:v", "libx264", "-preset", "slow",
+            "-crf", str(args.crf), "-profile:v", "high", "-pix_fmt", "yuv420p",
+            "-movflags", "+faststart", destino,
         ])
         if r2.returncode == 0:
             print("   ok", os.path.getsize(destino) // 1024, "KB")
