@@ -80,7 +80,11 @@
     return '<a class="card" href="proyecto.html?p=' + encodeURIComponent(p.slug) + '"' + attrs + '>' + inner + "</a>";
   }
 
-  /* ---------------- preview en vídeo al pasar el ratón ---------------- */
+  /* ---------------- vista previa al pasar el ratón ----------------
+     Cada proyecto tiene un clip mudo y corto en assets/video/preview/
+     (ver tools/make_previews.py). Se usa un <video> propio en vez del
+     reproductor de YouTube: arranca al instante y no muestra ningun
+     boton, titulo, marca de agua ni subtitulo. */
   var previewActivo = null;
   var puedePreview =
     window.matchMedia("(hover: hover) and (pointer: fine)").matches &&
@@ -88,169 +92,73 @@
     !(navigator.connection && navigator.connection.saveData) &&
     !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /* si la pestaña vuelve al frente YouTube puede haber pausado el embed:
-     se reanuda la preview activa para que no quede el icono de pausa */
+  /* si la pestaña vuelve al frente el navegador puede haber pausado el
+     clip: se reanuda la preview activa */
   document.addEventListener("visibilitychange", function () {
     if (!document.hidden && previewActivo && previewActivo.reanudar) previewActivo.reanudar();
   });
 
   function bindPreviews(root) {
     if (!puedePreview || !root) return;
-    [].forEach.call(root.querySelectorAll(".card[data-yt]:not([data-preview])"), function (card) {
-      var id = card.dataset.yt;
-      if (!id) return;
+    [].forEach.call(root.querySelectorAll(".card[data-slug]:not([data-preview])"), function (card) {
+      var slug = card.dataset.slug;
+      if (!slug) return;
       card.dataset.preview = "1";
-      var inicio = parseInt(card.dataset.start, 10);
-      if (isNaN(inicio) || inicio < 0) inicio = 15;
       var timer = null;
-      var frame = null;
-      var temporizadores = [];
-      var oyente = null;
-      var revelado = false;
-      var escuchando = false;
-      var pings = 0;
-      var ultimoPlay = 0;
-      var estadoAnterior = -2;
+      var video = null;
 
-      /* YouTube pinta su interfaz (titulo, boton de pausa, "Mas videos",
-         logo) durante los primeros segundos aunque se pase controls=0, y
-         no hay ningun parametro que la desactive: lo unico que funciona es
-         esperar a que el reproductor la retire sola. Hasta entonces el
-         iframe se queda oculto y se ve la miniatura de la tarjeta. */
-      var ESPERA_INTERFAZ = 5500;
-
-      function programar(fn, ms) {
-        temporizadores.push(setTimeout(fn, ms));
-      }
-
-      /* control del reproductor por postMessage (YouTube IFrame API) */
-      function mandar(func, args) {
-        if (!frame) return;
-        try {
-          frame.contentWindow.postMessage(
-            JSON.stringify({ event: "command", func: func, args: args || [] }), "*"
-          );
-        } catch (e) {}
-      }
-
-      function revelar() {
-        if (revelado || !frame) return;
-        revelado = true;
-        frame.classList.add("visible");
-      }
-
-      function quitarSubtitulos() {
-        mandar("unloadModule", ["captions"]);
-        mandar("setOption", ["captions", "track", {}]);
-      }
-
-      /* El reproductor solo empieza a informar de su estado cuando recibe
-         el evento "listening", y ese primer envio se pierde si el player
-         aun no esta listo: se insiste hasta que contesta. */
-      function pedirEstado() {
-        if (!frame || escuchando || pings > 40) return;
-        pings++;
-        try {
-          frame.contentWindow.postMessage(
-            JSON.stringify({ event: "listening", id: id }), "*"
-          );
-        } catch (e) {}
-        programar(pedirEstado, 400);
-      }
-
-      function alEstado(estado) {
-        escuchando = true;
-        if (estado === estadoAnterior) return;
-        estadoAnterior = estado;
-        if (estado === 1) {
-          /* reproduciendo: fuera subtitulos automaticos */
-          quitarSubtitulos();
-        } else if (estado === 0 || estado === 2) {
-          /* 0 = terminado, 2 = en pausa: se vuelve a arrancar */
-          var ahora = Date.now();
-          if (ahora - ultimoPlay > 900) {
-            ultimoPlay = ahora;
-            mandar("playVideo");
-          }
-        }
-      }
-
-      function vigilar(win) {
-        if (oyente) window.removeEventListener("message", oyente);
-        oyente = function (e) {
-          if (!frame || e.source !== win) return;
-          var dato = e.data;
-          if (typeof dato === "string") {
-            try { dato = JSON.parse(dato); } catch (err) { return; }
-          }
-          if (!dato) return;
-          /* el estado llega de tres formas segun el canal del reproductor:
-             onStateChange -> info = numero
-             infoDelivery -> info.playerState
-             infoDelivery -> infoDelivery.playerState */
-          if (dato.event === "onStateChange" && typeof dato.info === "number") {
-            alEstado(dato.info);
-          } else if (dato.info && typeof dato.info.playerState === "number") {
-            alEstado(dato.info.playerState);
-          } else if (dato.infoDelivery && typeof dato.infoDelivery.playerState === "number") {
-            alEstado(dato.infoDelivery.playerState);
-          }
-        };
-        window.addEventListener("message", oyente);
+      function reproducir(v) {
+        var p = v.play();
+        if (p && p.catch) p.catch(function () {});
       }
 
       function cargar() {
-        if (frame) return;
+        if (video) return;
         /* una sola preview activa a la vez */
         if (previewActivo) previewActivo.cerrar();
-        var origen = /^https?:$/.test(location.protocol) ? location.origin : "";
-        frame = document.createElement("iframe");
-        frame.className = "card-preview";
-        frame.setAttribute("tabindex", "-1");
-        frame.setAttribute("aria-hidden", "true");
-        frame.setAttribute("title", "");
-        frame.allow = "autoplay; encrypted-media; picture-in-picture";
-        frame.src =
-          "https://www.youtube-nocookie.com/embed/" + id +
-          "?autoplay=1&mute=1&controls=0&loop=1&playlist=" + id +
-          "&playsinline=1&modestbranding=1&rel=0&iv_load_policy=3&disablekb=1" +
-          "&fs=0&showinfo=0&cc_load_policy=0&autohide=1&enablejsapi=1" +
-          "&start=" + inicio +
-          (origen ? "&origin=" + encodeURIComponent(origen) : "");
-        card.appendChild(frame);
-        /* el evento load de un iframe de YouTube puede tardar varios
-           segundos, asi que la escucha y los pings arrancan ya: el
-           WindowProxy del iframe no cambia al navegar */
-        vigilar(frame.contentWindow);
-        mandar("mute");
-        pedirEstado();
-        programar(revelar, ESPERA_INTERFAZ);
+        video = document.createElement("video");
+        video.className = "card-preview";
+        video.muted = true;
+        video.loop = true;
+        video.playsInline = true;
+        video.setAttribute("muted", "");
+        video.setAttribute("playsinline", "");
+        video.setAttribute("preload", "auto");
+        video.setAttribute("aria-hidden", "true");
+        video.setAttribute("tabindex", "-1");
+        video.src = "assets/video/preview/" + slug + ".mp4";
+        /* se muestra en cuanto hay primer fotograma: sin esperas ni capas */
+        video.addEventListener("loadeddata", function () {
+          if (!video) return;
+          video.classList.add("visible");
+          reproducir(video);
+        });
+        video.addEventListener("error", function () {
+          descargar();
+        });
+        card.appendChild(video);
         previewActivo = {
           card: card,
           cerrar: descargar,
-          reanudar: function () { mandar("playVideo"); }
+          reanudar: function () { if (video) reproducir(video); }
         };
       }
 
       function descargar() {
         clearTimeout(timer);
-        temporizadores.forEach(clearTimeout);
-        temporizadores = [];
-        revelado = true;          // evita revelados pendientes
-        escuchando = true;        // corta la ronda de pings
-        if (oyente) { window.removeEventListener("message", oyente); oyente = null; }
         if (previewActivo && previewActivo.card === card) previewActivo = null;
-        if (!frame) return;
-        var f = frame;
-        frame = null;
-        f.classList.remove("visible");
+        if (!video) return;
+        var v = video;
+        video = null;
+        v.classList.remove("visible");
+        try { v.pause(); } catch (e) {}
         setTimeout(function () {
-          if (f.parentNode) f.parentNode.removeChild(f);
+          if (v.parentNode) v.parentNode.removeChild(v);
         }, 520);
       }
 
       card.addEventListener("mouseenter", function () {
-        timer = setTimeout(cargar, 80);
+        timer = setTimeout(cargar, 60);
       });
       card.addEventListener("mouseleave", descargar);
       card.addEventListener("focusout", descargar);
