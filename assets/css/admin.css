@@ -138,3 +138,20 @@ body.admin{background:var(--bg);}
 .nota-final h3{font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:var(--muted);margin-bottom:0.5rem;}
 .nota-final p{font-size:12.5px;line-height:1.75;color:var(--muted);}
 .sucio::after{content:" ·";color:var(--sand);}
+
+/* ---------------------------- avisos flotantes ---------------------------- */
+.toast{
+  position:fixed;left:50%;bottom:1.5rem;transform:translate(-50%, 1.5rem);
+  max-width:min(680px, calc(100vw - 2rem));padding:0.9rem 1.1rem;
+  background:#0C1F19;border:0.5px solid var(--faint);border-left:2px solid var(--accent);
+  color:var(--text);font-size:12.5px;line-height:1.6;white-space:pre-line;
+  box-shadow:0 18px 50px rgba(0,0,0,0.55);z-index:200;opacity:0;pointer-events:none;
+  transition:opacity .25s, transform .25s;
+}
+.toast.visible{opacity:1;transform:translate(-50%, 0);}
+.toast.ok{border-left-color:var(--accent-soft);}
+.toast.error{border-left-color:#c07a6e;background:#20120F;}
+
+/* ------------------------------ subir foto ------------------------------ */
+.subida{display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;}
+.subida .ayuda{margin:0;}

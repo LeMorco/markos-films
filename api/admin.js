@@ -264,6 +264,37 @@ async function escribirFichero(ruta, contenido, sha, mensaje) {
   return { commit: datos.commit && datos.commit.sha ? datos.commit.sha.slice(0, 7) : null };
 }
 
+async function escribirBinario(ruta, buffer, mensaje) {
+  const raiz = env("ADMIN_LOCAL_ROOT");
+  if (raiz) {
+    const completo = pathMod.join(raiz, ruta);
+    await fsp.mkdir(pathMod.dirname(completo), { recursive: true });
+    await fsp.writeFile(completo, buffer);
+    return { commit: "local" };
+  }
+
+  const r = await fetch("https://api.github.com/repos/" + repo() + "/contents/" + ruta, {
+    method: "PUT",
+    headers: {
+      Authorization: "Bearer " + token(),
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+      "User-Agent": "markos-admin"
+    },
+    body: JSON.stringify({
+      message: mensaje,
+      content: buffer.toString("base64"),
+      branch: rama()
+    })
+  });
+  if (!r.ok) {
+    const detalle = await r.text();
+    throw new Error("GitHub " + r.status + " al subir la imagen: " + detalle.slice(0, 300));
+  }
+  const datos = await r.json();
+  return { commit: datos.commit && datos.commit.sha ? datos.commit.sha.slice(0, 7) : null };
+}
+
 /* ------------------------------- validación ------------------------------- */
 
 function normalizarProyectos(datos) {
@@ -468,6 +499,37 @@ async function escribir(fichero, actual, valor, mensaje) {
   return { ok: true, commit: resultado.commit };
 }
 
+async function subirImagen(datos) {
+  const codigo = texto(datos.codigo, 12)
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]/g, "");
+  if (!codigo) throw new Error("Falta el código de la referencia");
+
+  const coincidencia = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(
+    String(datos.base64 || "")
+  );
+  if (!coincidencia) throw new Error("La imagen debe ser JPG, PNG o WebP");
+
+  const buffer = Buffer.from(coincidencia[2], "base64");
+  if (!buffer.length) throw new Error("La imagen está vacía");
+  if (buffer.length > 4 * 1024 * 1024) {
+    throw new Error("La imagen pesa demasiado después de comprimirla (máx. 4 MB)");
+  }
+
+  const extension = coincidencia[1] === "jpeg" ? "jpg" : coincidencia[1];
+  const sello =
+    new Date().toISOString().slice(0, 10).replace(/-/g, "") +
+    "-" +
+    crypto.randomBytes(2).toString("hex");
+  const ruta = "assets/img/material/" + codigo + "-" + sello + "." + extension;
+  const resultado = await escribirBinario(
+    ruta,
+    buffer,
+    "Panel: foto de " + codigo + " (" + Math.round(buffer.length / 1024) + " KB)"
+  );
+  return { ok: true, foto: ruta, commit: resultado.commit };
+}
+
 /* ---------------------------------- handler ---------------------------------- */
 
 module.exports = async function handler(req, res) {
@@ -479,6 +541,30 @@ module.exports = async function handler(req, res) {
     (req.query && req.query.action) || enviado.action || "state";
 
   try {
+    if (accion === "diagnostico") {
+      const pruebas = [];
+      for (const clave of Object.keys(FICHEROS)) {
+        const def = FICHEROS[clave];
+        try {
+          const leido = await leerFichero(def.ruta);
+          pruebas.push({
+            fichero: def.ruta,
+            estado: leido.existe ? "ok" : "no existe",
+            bytes: leido.texto ? Buffer.byteLength(leido.texto, "utf8") : 0
+          });
+        } catch (error) {
+          pruebas.push({ fichero: def.ruta, estado: "error", detalle: String(error.message) });
+        }
+      }
+      return json(res, 200, {
+        configurado,
+        origen: env("ADMIN_LOCAL_ROOT") ? "disco local" : "GitHub",
+        repo: repo(),
+        rama: rama(),
+        pruebas
+      });
+    }
+
     if (accion === "state") {
       return json(res, 200, {
         configurado,
@@ -523,6 +609,11 @@ module.exports = async function handler(req, res) {
 
     if (accion === "load") {
       return json(res, 200, await cargar());
+    }
+
+    if (accion === "upload") {
+      if (req.method !== "POST") return json(res, 405, { error: "Usa POST" });
+      return json(res, 200, await subirImagen(enviado));
     }
 
     if (accion === "save") {

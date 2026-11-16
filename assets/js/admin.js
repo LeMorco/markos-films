@@ -93,6 +93,19 @@
     el.className = "estado" + (tipo ? " " + tipo : "");
   }
 
+  var toastTimer = null;
+  function toast(mensaje, tipo) {
+    var el = document.getElementById("toast");
+    if (!el) {
+      el = h("div", { id: "toast", clase: "toast", role: "status" });
+      document.body.appendChild(el);
+    }
+    el.textContent = mensaje;
+    el.className = "toast visible" + (tipo ? " " + tipo : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = "toast"; }, tipo === "error" ? 9000 : 4500);
+  }
+
   function marcarSucio() {
     sucio = true;
     aviso("Cambios sin guardar");
@@ -174,6 +187,23 @@
     } finally {
       boton.disabled = false;
       boton.textContent = "Entrar";
+    }
+  });
+
+  document.getElementById("btn-diagnostico").addEventListener("click", async function () {
+    toast("Comprobando el servidor…");
+    try {
+      var d = await api("diagnostico");
+      var lineas = d.pruebas
+        .map(function (p) {
+          return (p.estado === "ok" ? "✓ " : "✕ ") + p.fichero + " · " + p.estado +
+            (p.bytes ? " · " + p.bytes + " B" : "") + (p.detalle ? " · " + p.detalle : "");
+        })
+        .join("\n");
+      toast(d.origen + " · " + d.repo + " · rama " + d.rama + "\n" + lineas,
+        d.pruebas.every(function (p) { return p.estado === "ok"; }) ? "ok" : "error");
+    } catch (error) {
+      toast("Diagnóstico: " + error.message, "error");
     }
   });
 
@@ -337,6 +367,31 @@
     if (!visibles) lista.appendChild(h("p", { clase: "ayuda", texto: "Ningún resultado." }));
   }
 
+  function comprimirImagen(fichero, maximo) {
+    return new Promise(function (resolver, rechazar) {
+      if (!/^image\//.test(fichero.type)) return rechazar(new Error("Ese archivo no es una imagen"));
+      var lector = new FileReader();
+      lector.onerror = function () { rechazar(new Error("No se pudo leer la imagen")); };
+      lector.onload = function () {
+        var img = new Image();
+        img.onerror = function () { rechazar(new Error("La imagen está dañada")); };
+        img.onload = function () {
+          var escala = Math.min(1, (maximo || 1600) / Math.max(img.width, img.height));
+          var lienzo = document.createElement("canvas");
+          lienzo.width = Math.round(img.width * escala);
+          lienzo.height = Math.round(img.height * escala);
+          var ctx = lienzo.getContext("2d");
+          ctx.fillStyle = "#0c1f19";
+          ctx.fillRect(0, 0, lienzo.width, lienzo.height);
+          ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+          resolver(lienzo.toDataURL("image/jpeg", 0.86));
+        };
+        img.src = lector.result;
+      };
+      lector.readAsDataURL(fichero);
+    });
+  }
+
   function fichaMaterial(item, indice) {
     var ficha = h("article", { clase: "ficha material-ficha abierta" });
     var miniatura = h("div", { clase: "miniatura" });
@@ -405,9 +460,48 @@
       clave: "foto_" + indice, etiqueta: "Foto", ancho: true,
       marcador: "assets/img/material/A001.jpg",
       valor: item.foto || "",
-      ayuda: "Ruta de la imagen dentro del repo.",
+      ayuda: "Puedes subir una foto nueva o escribir la ruta de una que ya exista.",
       onInput: function (v) { item.foto = v; pintarMiniatura(); }
     }));
+
+    var entradaFoto = h("input", { type: "file", accept: "image/*", hidden: true });
+    var botonFoto = h("button", {
+      clase: "boton boton-mini", type: "button", texto: "Subir foto…",
+      onclick: function () { entradaFoto.click(); }
+    });
+    var progresoFoto = h("span", { clase: "ayuda", texto: "" });
+
+    entradaFoto.addEventListener("change", async function () {
+      var fichero = entradaFoto.files && entradaFoto.files[0];
+      if (!fichero) return;
+      botonFoto.disabled = true;
+      progresoFoto.textContent = "Comprimiendo y subiendo…";
+      try {
+        var codigo = (item.codigo || "").toUpperCase();
+        if (!codigo) throw new Error("Pon primero el código de la referencia");
+        var dataUrl = await comprimirImagen(fichero, 1600);
+        var respuesta = await api("upload", {
+          action: "upload",
+          codigo: codigo,
+          base64: dataUrl
+        });
+        item.foto = respuesta.foto;
+        pintarMiniatura();
+        var campoFoto = cuerpo.querySelector('input[placeholder="assets/img/material/A001.jpg"]');
+        if (campoFoto) campoFoto.value = respuesta.foto;
+        progresoFoto.textContent = "Subida (" + Math.round(dataUrl.length / 1365) + " KB). Guarda el catálogo para aplicarla.";
+        marcarSucio();
+        toast("Foto subida. Pulsa «Guardar catálogo» para publicarla.", "ok");
+      } catch (error) {
+        progresoFoto.textContent = "";
+        toast(error.message, "error");
+      } finally {
+        botonFoto.disabled = false;
+        entradaFoto.value = "";
+      }
+    });
+
+    cuerpo.appendChild(h("div", { clase: "campo-ancho subida" }, [botonFoto, entradaFoto, progresoFoto]));
     cuerpo.appendChild(h("div", { clase: "ficha-acciones" }, [
       h("button", {
         clase: "boton boton-mini boton-peligro", type: "button", texto: "Eliminar referencia",
@@ -543,10 +637,14 @@
           "ok"
         );
       }
-      estado = await api("load");
-      pintarTodo();
+      var fresco = await api("load");
+      ["proyectos", "material", "textos"].forEach(function (clave) {
+        if (fresco[clave]) estado[clave].sha = fresco[clave].sha;
+      });
+      toast("Cambios publicados. La web se actualiza en ~60 s.", "ok");
     } catch (error) {
       marcarLimpio(error.message, "error");
+      toast(error.message, "error");
       if (error.codigo === 409) {
         estado = await api("load");
         pintarTodo();
