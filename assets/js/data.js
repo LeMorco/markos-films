@@ -16,7 +16,7 @@ window.MARKOS = {
   /* Opcional: si algún día quieres enviar el formulario sin abrir
      el correo, pon aquí el endpoint de Formspree/Resend.
      Vacío = se usa mailto: con el resumen de material. */
-  formEndpoint: "",
+  formEndpoint: "/api/solicitud",
 
   proyectos: [
     {

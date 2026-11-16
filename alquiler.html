@@ -109,10 +109,14 @@
       <label for="cf-notas">Notas</label>
       <textarea id="cf-notas" name="notas" rows="2" placeholder="Necesidades de luz, localización, transporte…"></textarea>
     </div>
-    <p class="form-note">Al enviar se abrirá tu cliente de correo con la solicitud preparada, dirigida a markosfilms1@gmail.com. También puedes copiarla. Antes de la entrega se firma el documento de condiciones y responsabilidad del alquiler.</p>
+    <div class="field" style="position:absolute;left:-9999px;height:0;overflow:hidden" aria-hidden="true">
+      <label for="cf-empresa">Empresa</label>
+      <input id="cf-empresa" name="empresa" tabindex="-1" autocomplete="off">
+    </div>
+    <p class="form-note">La solicitud llega directamente a mi correo con el material y las fechas que indiques. Normalmente respondo en el mismo día. Antes de la entrega se firma el documento de condiciones y responsabilidad del alquiler.</p>
     <div style="display:flex;gap:0.6rem;flex-wrap:wrap;">
       <button class="btn btn-primary btn-sm" type="submit">Enviar solicitud</button>
-      <button class="btn btn-sm" type="button" data-copy>Copiar</button>
+      <button class="btn btn-sm" type="button" data-copy>Copiar resumen</button>
     </div>
     <p class="form-status" id="form-status" role="status"></p>
   </form>

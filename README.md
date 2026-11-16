@@ -19,12 +19,36 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
   Los campos vacíos (`director`, `productora`, `year`, `descripcion`) se muestran como «Por confirmar».
 - **`assets/js/rental.js`** — catálogo: categorías y las 42 piezas con código, unidades y ficha.
 - **`assets/img/material/`** — foto de cada pieza, nombrada con su código (`A001.jpg`…).
+- **`api/solicitud.js`** — función serverless que envía las solicitudes por Resend.
 
 ## Cómo funciona la solicitud de presupuesto
 
-Se elige material del catálogo (se guarda en `localStorage`), se rellenan fechas y datos, y al enviar se abre el cliente de correo con el resumen dirigido a `markosfilms1@gmail.com`. También hay un botón para copiar el texto.
+El visitante elige material del catálogo (se guarda en `localStorage`), indica fechas y datos, y pulsa **Enviar solicitud**. El navegador hace `POST` a `/api/solicitud`, una función serverless de Vercel que manda el correo con **Resend**.
 
-Para enviarlo sin depender del cliente de correo, pon en `data.js` un endpoint (`formEndpoint`) de Formspree, Resend o similar: el formulario hará `POST` JSON con los datos y la lista de material.
+El correo llega con: nombre, email, fechas, proyecto, notas y la tabla de material (cantidad + nombre + código), con `reply-to` puesto en el email del solicitante. Al enviarse, la cesta se vacía.
+
+### Configurar Resend (una sola vez)
+
+1. Crea una cuenta en https://resend.com y genera una **API key** en *API Keys*.
+2. En Vercel → tu proyecto → **Settings → Environment Variables**, añade:
+
+| Variable | Valor |
+|---|---|
+| `RESEND_API_KEY` | tu API key (`re_…`) |
+| `RESEND_FROM` | remitente verificado, p. ej. `Marcos Donate <web@markosfilms.com>` |
+| `RESEND_TO` | destinatario (por defecto `markosfilms1@gmail.com`) |
+
+3. Vuelve a desplegar (**Redeploy**) para que las variables se apliquen.
+
+**Importante sobre el remitente:** Resend solo deja enviar desde un dominio verificado (*Domains → Add domain* + registros DNS). Sin dominio propio, deja `RESEND_FROM` vacío y se usará `onboarding@resend.dev`, que **solo puede enviar a la dirección con la que se creó la cuenta de Resend** — es decir, la cuenta debe estar creada con `markosfilms1@gmail.com`.
+
+### Probar en local
+
+```bash
+npx vercel dev     # sirve la web y /api/solicitud con las variables de .env.local
+```
+
+Si `/api/solicitud` no está disponible o falla, el formulario muestra el error y mantiene la cesta; el botón **Copiar resumen** sigue funcionando como alternativa.
 
 ## Despliegue en Vercel
 

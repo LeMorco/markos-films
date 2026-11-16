@@ -33,8 +33,25 @@
   </div>
 </nav>
 
-<header class="hero">
-  <img class="hero-img" src="assets/img/hero.jpg" alt="Fotograma de Trabextiarrak, videoclip de Maruxak">
+<header class="hero" id="hero">
+  <div class="hero-slides" id="hero-slides">
+    <div class="hero-slide is-active" data-title="Trabextiarrak" data-meta="Maruxak" data-href="proyecto.html?p=trabestiarrak">
+      <img src="assets/img/hero/01.jpg" alt="Fotograma de Trabextiarrak, videoclip de Maruxak" fetchpriority="high" decoding="async">
+    </div>
+    <div class="hero-slide" data-title="Eskua" data-meta="Maruxak · Olaia Inziarte" data-href="proyecto.html?p=eskua">
+      <img src="assets/img/hero/02.jpg" alt="Fotograma de Eskua, videoclip de Maruxak" decoding="async">
+    </div>
+    <div class="hero-slide" data-title="Bere Euskalkik" data-meta="Maruxak · ft. Malentxo" data-href="proyecto.html?p=bere-euskalkik">
+      <img src="assets/img/hero/03.jpg" alt="Fotograma de Bere Euskalkik, videoclip de Maruxak" decoding="async">
+    </div>
+    <div class="hero-slide" data-title="Mina" data-meta="Maruxak" data-href="proyecto.html?p=mina">
+      <img src="assets/img/hero/04.jpg" alt="Fotograma de Mina, videoclip de Maruxak" decoding="async">
+    </div>
+    <div class="hero-slide" data-title="Dardara · Zerrenda" data-meta="Maruxak · Fermin Muguruza" data-href="proyecto.html?p=dardara-zerrenda">
+      <img src="assets/img/hero/05.jpg" alt="Fotograma de Dardara, videoclip de Maruxak" decoding="async">
+    </div>
+  </div>
+
   <div class="hero-inner">
     <p class="hero-kicker label">Técnico de iluminación · Navarra</p>
     <h1>Luz para<br>contar <em>historias</em></h1>
@@ -44,7 +61,20 @@
       <a class="btn" href="alquiler.html">Alquilar material</a>
     </div>
   </div>
-  <div class="hero-foot">Scroll</div>
+
+  <div class="hero-nav" id="hero-nav">
+    <a class="hero-caption" id="hero-caption" href="proyecto.html?p=trabestiarrak">
+      <span class="hc-title">Trabextiarrak</span>
+      <span class="hc-meta">Maruxak</span>
+    </a>
+    <div class="hero-dots" id="hero-dots" role="tablist" aria-label="Portadas">
+      <button class="hero-dot is-active" type="button" role="tab" aria-label="Portada 1: Trabextiarrak"><span></span></button>
+      <button class="hero-dot" type="button" role="tab" aria-label="Portada 2: Eskua"><span></span></button>
+      <button class="hero-dot" type="button" role="tab" aria-label="Portada 3: Bere Euskalkik"><span></span></button>
+      <button class="hero-dot" type="button" role="tab" aria-label="Portada 4: Mina"><span></span></button>
+      <button class="hero-dot" type="button" role="tab" aria-label="Portada 5: Dardara"><span></span></button>
+    </div>
+  </div>
 </header>
 
 <section class="section" id="proyectos">

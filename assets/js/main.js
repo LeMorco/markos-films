@@ -212,4 +212,76 @@
       if (relGrid) relGrid.innerHTML = rel.map(cardHTML).join("");
     }
   }
+
+  /* ---------------- portadas rotatorias del inicio ---------------- */
+  var heroBox = document.getElementById("hero-slides");
+  if (heroBox) {
+    var hSlides = [].slice.call(heroBox.querySelectorAll(".hero-slide"));
+    var hDots = [].slice.call(document.querySelectorAll(".hero-dot"));
+    var hCaption = document.getElementById("hero-caption");
+    var hNav = document.getElementById("hero-nav");
+    var DURACION = 4000;
+    var hIdx = 0;
+    var hTimer = null;
+    var hPausado = false;
+    var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    document.documentElement.style.setProperty("--dur", DURACION + "ms");
+
+    function pintarHero(n) {
+      hIdx = (n + hSlides.length) % hSlides.length;
+      hSlides.forEach(function (s, k) { s.classList.toggle("is-active", k === hIdx); });
+      hDots.forEach(function (d, k) {
+        var activo = k === hIdx;
+        d.classList.toggle("is-active", activo);
+        d.setAttribute("aria-selected", activo ? "true" : "false");
+        d.setAttribute("tabindex", activo ? "0" : "-1");
+        var barra = d.firstElementChild;
+        if (barra) {
+          barra.style.animation = "none";
+          void barra.offsetWidth;
+          barra.style.animation = "";
+        }
+      });
+      var actual = hSlides[hIdx];
+      if (hCaption && actual) {
+        hCaption.href = actual.dataset.href || "#";
+        var titulo = hCaption.querySelector(".hc-title");
+        var meta = hCaption.querySelector(".hc-meta");
+        if (titulo) titulo.textContent = actual.dataset.title || "";
+        if (meta) meta.textContent = actual.dataset.meta || "";
+      }
+    }
+
+    function pararHero() { if (hTimer) { clearInterval(hTimer); hTimer = null; } }
+    function arrancarHero() {
+      pararHero();
+      if (reduceMotion) return;
+      hTimer = setInterval(function () {
+        if (!hPausado && !document.hidden) pintarHero(hIdx + 1);
+      }, DURACION);
+    }
+
+    hDots.forEach(function (d, k) {
+      d.addEventListener("click", function () { pintarHero(k); arrancarHero(); });
+      d.addEventListener("keydown", function (e) {
+        if (e.key === "ArrowRight") { e.preventDefault(); pintarHero(hIdx + 1); arrancarHero(); }
+        if (e.key === "ArrowLeft") { e.preventDefault(); pintarHero(hIdx - 1); arrancarHero(); }
+      });
+    });
+
+    if (hNav) {
+      hNav.addEventListener("mouseenter", function () { hPausado = true; });
+      hNav.addEventListener("mouseleave", function () { hPausado = false; });
+      hNav.addEventListener("focusin", function () { hPausado = true; });
+      hNav.addEventListener("focusout", function () { hPausado = false; });
+    }
+
+    document.addEventListener("visibilitychange", function () {
+      if (!document.hidden) { pintarHero(hIdx); arrancarHero(); }
+    });
+
+    pintarHero(0);
+    arrancarHero();
+  }
 })();

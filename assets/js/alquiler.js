@@ -275,43 +275,66 @@
   }
 
   if (form) {
+    var submitBtn = form.querySelector('button[type="submit"]');
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       if (!read().length) {
         status.textContent = "Añade al menos un equipo del catálogo.";
         return;
       }
-      var msg = buildMessage();
-      status.textContent = "Preparando el correo…";
 
-      if (D.formEndpoint) {
-        fetch(D.formEndpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({
-            nombre: msg.data.nombre, email: msg.data.email,
-            desde: msg.data.desde, hasta: msg.data.hasta,
-            proyecto: msg.data.proyecto, notas: msg.data.notas,
-            material: read().map(function (i) {
-              var m = findItem(i.id) || {};
-              return i.qty + " x " + (m.nombre || i.id);
-            }).join(", ")
-          })
-        }).then(function (r) {
-          if (!r.ok) throw new Error("error");
-          status.textContent = "Solicitud enviada. Te responderá en breve.";
-          write([]);
-        }).catch(function () {
-          status.textContent = "No se pudo enviar automáticamente. Usa el botón de correo.";
-        });
+      var msg = buildMessage();
+      var material = read().map(function (i) {
+        var m = findItem(i.id) || {};
+        return { codigo: m.codigo || "", nombre: m.nombre || i.id, cantidad: i.qty };
+      });
+
+      if (!D.formEndpoint) {
+        window.location.href = "mailto:" + (D.email || "") +
+          "?subject=" + encodeURIComponent(msg.subject) +
+          "&body=" + encodeURIComponent(msg.body);
+        status.textContent = "Se ha abierto tu cliente de correo con la solicitud preparada.";
         return;
       }
 
-      var url = "mailto:" + (D.email || "") +
-        "?subject=" + encodeURIComponent(msg.subject) +
-        "&body=" + encodeURIComponent(msg.body);
-      window.location.href = url;
-      status.textContent = "Se ha abierto tu cliente de correo con la solicitud preparada.";
+      status.className = "form-status";
+      status.textContent = "Enviando la solicitud…";
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = "0.65"; }
+
+      fetch(D.formEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          nombre: msg.data.nombre,
+          email: msg.data.email,
+          desde: msg.data.desde,
+          hasta: msg.data.hasta,
+          proyecto: msg.data.proyecto,
+          notas: msg.data.notas,
+          material: material,
+          empresa: document.getElementById("cf-empresa") ? document.getElementById("cf-empresa").value : ""
+        })
+      })
+        .then(function (r) {
+          return r.json().catch(function () { return {}; }).then(function (data) {
+            return { ok: r.ok && data.ok !== false, error: data.error };
+          });
+        })
+        .then(function (res) {
+          if (!res.ok) throw new Error(res.error || "No se ha podido enviar la solicitud.");
+          status.textContent = "Solicitud enviada. Recibirás el presupuesto por correo en breve.";
+          write([]);
+          form.reset();
+        })
+        .catch(function (err) {
+          status.className = "form-status is-error";
+          status.textContent = (err && err.message ? err.message : "No se ha podido enviar la solicitud.") +
+            " También puedes copiar el resumen y enviarlo por tu cuenta.";
+        })
+        .then(function () {
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ""; }
+        });
     });
   }
 
