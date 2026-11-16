@@ -72,7 +72,8 @@ function infoToken() {
         : "desconocido",
     longitud: t.length,
     conEspacios: t !== String(process.env.GITHUB_TOKEN || ""),
-    empiezaPor: t.slice(0, 4) + "…"
+    empiezaPor: t.slice(0, 4) + "…",
+    pareceValido: /^(gh[pousr]_|github_pat_)/.test(t)
   };
 }
 
@@ -599,8 +600,14 @@ module.exports = async function handler(req, res) {
           pruebas.push({ fichero: def.ruta, estado: "error", detalle: String(error.message) });
         }
       }
+      const t = infoToken();
+      const aviso = t.presente && !t.pareceValido
+        ? "El valor de GITHUB_TOKEN no parece un token de GitHub: tiene que empezar por " +
+          "github_pat_ (fine-grained) o ghp_ (clásico) y no llevar la parte «GITHUB_TOKEN=»."
+        : "";
       return json(res, 200, {
         configurado,
+        aviso,
         origen: env("ADMIN_LOCAL_ROOT") ? "disco local" : "GitHub",
         repo: repo(),
         rama: rama(),
@@ -610,8 +617,14 @@ module.exports = async function handler(req, res) {
     }
 
     if (accion === "state") {
+      const t = infoToken();
+      const aviso = t.presente && !t.pareceValido
+        ? "El valor de GITHUB_TOKEN no parece un token de GitHub: tiene que empezar por " +
+          "github_pat_ (fine-grained) o ghp_ (clásico) y no llevar la parte «GITHUB_TOKEN=»."
+        : "";
       return json(res, 200, {
         configurado,
+        aviso,
         autenticado: configurado && autenticado(req),
         usuario: usuarioEsperado(),
         repo: env("ADMIN_LOCAL_ROOT") ? null : repo()
