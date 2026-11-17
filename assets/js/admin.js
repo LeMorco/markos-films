@@ -342,7 +342,35 @@
       onInput: function (valor) { proyecto.slug = valor; }
     }));
 
+    var botonClip;
+    if (proyecto.youtube) {
+      botonClip = h("button", {
+        clase: "boton boton-mini", type: "button", texto: "Generar clip de 7 s",
+        onclick: async function () {
+          botonClip.disabled = true;
+          try {
+            await api("clip", {
+              action: "clip",
+              url: "https://www.youtube.com/watch?v=" + proyecto.youtube,
+              slug: proyecto.slug,
+              inicio: proyecto.preview == null ? null : proyecto.preview
+            });
+            toast(
+              "Clip en cola. GitHub lo genera en ~2 minutos y la web se actualiza sola.\n" +
+                "Puedes seguir editando mientras tanto.",
+              "ok"
+            );
+          } catch (error) {
+            toast(error.message, "error");
+          } finally {
+            botonClip.disabled = false;
+          }
+        }
+      });
+    }
+
     cuerpo.appendChild(h("div", { clase: "ficha-acciones" }, [
+      botonClip,
       h("button", {
         clase: "boton boton-mini boton-peligro",
         type: "button",
@@ -361,6 +389,52 @@
     ficha.appendChild(cuerpo);
     return ficha;
   }
+
+  async function importarDesdeUrl() {
+    var entrada = document.getElementById("url-importar");
+    var boton = document.getElementById("btn-importar");
+    var url = (entrada.value || "").trim();
+    if (!url) {
+      entrada.focus();
+      return;
+    }
+    var conClip = document.getElementById("clip-importar").checked;
+    boton.disabled = true;
+    boton.textContent = "Buscando…";
+    aviso("Importando…");
+    try {
+      var r = await api("importar", { action: "importar", url: url, clip: conClip });
+      if (r.existente) {
+        toast("Ese vídeo ya está en el portfolio: «" + r.titulo + "».", "error");
+        return;
+      }
+      if (conClip) {
+        await api("clip", { action: "clip", url: url, slug: r.proyecto.slug });
+      }
+      entrada.value = "";
+      await cargarTodo();
+      marcarLimpio("Proyecto añadido", "ok");
+      toast(
+        "«" + r.proyecto.titulo + "» añadido como " + r.proyecto.slug + "." +
+          (conClip ? "\nClip en cola: GitHub lo publica en ~2 minutos." : ""),
+        "ok"
+      );
+    } catch (error) {
+      marcarLimpio(error.message, "error");
+      toast(error.message, "error");
+    } finally {
+      boton.disabled = false;
+      boton.textContent = "Añadir";
+    }
+  }
+
+  document.getElementById("btn-importar").addEventListener("click", importarDesdeUrl);
+  document.getElementById("url-importar").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      importarDesdeUrl();
+    }
+  });
 
   document.getElementById("btn-nuevo-proyecto").addEventListener("click", function () {
     estado.proyectos.datos.push({

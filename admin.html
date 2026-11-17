@@ -74,6 +74,23 @@
           <button class="boton boton-principal" data-guardar="proyectos">Guardar proyectos</button>
         </div>
       </div>
+      <div class="importar">
+        <div class="importar-fila">
+          <div class="campo">
+            <label for="url-importar">Añadir un proyecto con solo la URL de YouTube</label>
+            <input id="url-importar" type="text" placeholder="https://youtu.be/…" autocomplete="off" spellcheck="false">
+          </div>
+          <button class="boton boton-principal" id="btn-importar" type="button">Añadir</button>
+        </div>
+        <label class="check">
+          <input type="checkbox" id="clip-importar" checked>
+          <span>Generar también el clip de vista previa (7 s)</span>
+        </label>
+        <p class="ayuda" id="importar-ayuda">
+          Saca el título, el artista, la dirección de la ficha y la miniatura (que viene de YouTube).
+          Después puedes completar tipo, año y descripción. El clip tarda ~2 minutos y lo prepara GitHub.
+        </p>
+      </div>
       <div id="lista-proyectos" class="lista"></div>
     </section>
 

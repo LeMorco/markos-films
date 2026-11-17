@@ -38,6 +38,8 @@ const FICHEROS = {
   textos: { ruta: "content/textos.json", marca: null, tipo: "json" }
 };
 
+const COLA_CLIPS = "content/cola-clips.json";
+
 const CLAVES_TEXTO = [
   "hero_kicker",
   "hero_sub",
@@ -560,6 +562,103 @@ async function escribir(fichero, actual, valor, mensaje) {
   return { ok: true, commit: resultado.commit };
 }
 
+function idYoutube(url) {
+  const m = /(?:v=|\/embed\/|\/shorts\/|\/live\/|youtu\.be\/)([A-Za-z0-9_-]{11})/.exec(String(url || ""));
+  if (!m) return null;
+  return m[1];
+}
+
+async function datosYoutube(vid) {
+  const enlace = "https://www.youtube.com/watch?v=" + vid;
+  const salida = { vid, enlace, titulo: "", autor: "", miniatura: "" };
+
+  try {
+    const r = await fetch(
+      "https://www.youtube.com/oembed?format=json&url=" + encodeURIComponent(enlace),
+      { headers: { "User-Agent": "markos-admin" } }
+    );
+    if (r.ok) {
+      const d = await r.json();
+      salida.titulo = texto(d.title, 160);
+      salida.autor = texto(d.author_name, 120);
+      salida.miniatura = texto(d.thumbnail_url, 300);
+    }
+  } catch (error) {
+    /* si falla, se sigue con los valores por defecto */
+  }
+
+  if (!salida.miniatura) salida.miniatura = "https://i.ytimg.com/vi/" + vid + "/maxresdefault.jpg";
+  return salida;
+}
+
+/* separa "Artista - Título" o "Título // Artista" en artista y título */
+function partirTitulo(bruto, autor) {
+  const limpio = String(bruto || "").trim();
+  const guion = /^(.*?)\s+[-–—]\s+(.+)$/.exec(limpio);
+  if (guion) {
+    return { artista: texto(guion[1], 120), titulo: texto(guion[2], 160) };
+  }
+  return { artista: texto(autor, 120), titulo: texto(limpio, 160) };
+}
+
+async function importar(datos) {
+  const vid = idYoutube(datos.url);
+  if (!vid) throw new Error("Esa URL no parece de YouTube (youtu.be/… o watch?v=…)");
+
+  const actual = await leerFichero(FICHEROS.proyectos.ruta);
+  const markos = extraerJs(actual.texto, FICHEROS.proyectos.marca) || {};
+  const lista = Array.isArray(markos.proyectos) ? markos.proyectos : [];
+
+  const ya = lista.filter((p) => p && p.youtube === vid)[0];
+  if (ya) {
+    return { ok: true, existente: true, slug: ya.slug, titulo: ya.titulo };
+  }
+
+  const info = await datosYoutube(vid);
+  const partes = partirTitulo(info.titulo, info.autor);
+
+  let base = slug(partes.titulo) || slug("proyecto-" + vid);
+  let candidato = base;
+  let n = 2;
+  const usados = lista.map((p) => p && p.slug);
+  while (usados.indexOf(candidato) > -1) {
+    candidato = base + "-" + n;
+    n += 1;
+  }
+
+  const proyecto = {
+    slug: candidato,
+    titulo: partes.titulo || info.titulo || "Proyecto",
+    tipo: "",
+    artista: partes.artista,
+    youtube: vid,
+    link: info.enlace,
+    director: "",
+    productora: "",
+    year: "",
+    rol: markos.rol ? "Técnico de iluminación (gaffer)" : "",
+    descripcion: "",
+    nota: ""
+  };
+
+  const nuevo = Object.assign({}, markos, { proyectos: lista.concat([proyecto]) });
+  const contenido = serializarJs(actual.texto, FICHEROS.proyectos.marca, nuevo);
+  const resultado = await escribirFichero(
+    FICHEROS.proyectos.ruta,
+    contenido,
+    actual.sha,
+    "Panel: nuevo proyecto desde YouTube (" + proyecto.slug + ")"
+  );
+
+  return {
+    ok: true,
+    proyecto,
+    miniatura: info.miniatura,
+    commit: resultado.commit,
+    clip: Boolean(datos.clip)
+  };
+}
+
 async function subirImagen(datos) {
   const codigo = texto(datos.codigo, 12)
     .toUpperCase()
@@ -589,6 +688,38 @@ async function subirImagen(datos) {
     "Panel: foto de " + codigo + " (" + Math.round(buffer.length / 1024) + " KB)"
   );
   return { ok: true, foto: ruta, commit: resultado.commit };
+}
+
+async function encolarClip(datos) {
+  const url = texto(datos.url, 300);
+  const vid = idYoutube(url);
+  if (!vid) throw new Error("Esa URL no parece de YouTube");
+  const nombre = slug(datos.slug) || slug("clip-" + vid);
+
+  const actual = await leerFichero(COLA_CLIPS);
+  let cola = [];
+  if (actual.texto) {
+    try {
+      cola = JSON.parse(actual.texto);
+    } catch (error) {
+      cola = [];
+    }
+  }
+  if (!Array.isArray(cola)) cola = [];
+  cola = cola.filter((c) => c && c.slug !== nombre);
+  cola.push({
+    slug: nombre,
+    url: "https://www.youtube.com/watch?v=" + vid,
+    inicio: datos.inicio == null ? null : Math.max(0, parseInt(datos.inicio, 10) || 0)
+  });
+
+  const resultado = await escribirFichero(
+    COLA_CLIPS,
+    JSON.stringify(cola, null, 2) + "\n",
+    actual.sha,
+    "Panel: en cola el clip de " + nombre
+  );
+  return { ok: true, enCola: cola.length, commit: resultado.commit };
 }
 
 /* ---------------------------------- handler ---------------------------------- */
@@ -683,6 +814,16 @@ module.exports = async function handler(req, res) {
 
     if (accion === "load") {
       return json(res, 200, await cargar());
+    }
+
+    if (accion === "importar") {
+      if (req.method !== "POST") return json(res, 405, { error: "Usa POST" });
+      return json(res, 200, await importar(enviado));
+    }
+
+    if (accion === "clip") {
+      if (req.method !== "POST") return json(res, 405, { error: "Usa POST" });
+      return json(res, 200, await encolarClip(enviado));
     }
 
     if (accion === "upload") {

@@ -155,3 +155,16 @@ body.admin{background:var(--bg);}
 /* ------------------------------ subir foto ------------------------------ */
 .subida{display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;}
 .subida .ayuda{margin:0;}
+
+/* --------------------------- importar por URL --------------------------- */
+.importar{
+  border:0.5px solid var(--accent);background:rgba(114,155,147,0.06);
+  padding:1.1rem 1.2rem;margin-bottom:1.2rem;display:flex;flex-direction:column;gap:0.7rem;
+}
+.importar-fila{display:flex;gap:0.8rem;align-items:flex-end;flex-wrap:wrap;}
+.importar-fila .campo{flex:1;min-width:260px;}
+.importar .ayuda{margin:0;}
+.check{display:flex;align-items:center;gap:0.55rem;font-size:12.5px;color:var(--text-dim);cursor:pointer;}
+.check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;}
+.clip-estado{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
+.clip-estado.hecho{color:var(--accent-soft);}
