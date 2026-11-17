@@ -50,7 +50,9 @@ window.MARKOS = {
       "year": "2026",
       "rol": "Gaffer",
       "descripcion": "",
-      "nota": ""
+      "nota": "",
+      "preview": 170,
+      "previewFin": 177
     },
     {
       "slug": "bere-euskalkik",
