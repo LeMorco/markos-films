@@ -21,14 +21,14 @@ window.MARKOS = {
     {
       "slug": "cielo-y-mar",
       "titulo": "Cielo y mar",
-      "tipo": "cortometraje",
+      "tipo": "Videoclip",
       "artista": "Cobardes",
       "youtube": "bPbJyR84kCk",
       "link": "https://www.youtube.com/watch?v=bPbJyR84kCk",
-      "director": "",
+      "director": "Mikel Arraiz",
       "productora": "Cobardes",
-      "year": "",
-      "rol": "Técnico de iluminación (gaffer)",
+      "year": "2026",
+      "rol": "Gaffer",
       "descripcion": "",
       "nota": ""
     },
