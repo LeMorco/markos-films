@@ -165,28 +165,14 @@ window.MARKOS = {
       "artista": "Shortzinema 2026",
       "youtube": "",
       "link": "https://www.facebook.com/culturagobiernodenavarra/videos/1569445758286819/",
-      "thumb": "assets/img/proyectos/lo-que-queda-todavia.jpg",
+      "director": "",
+      "productora": "",
+      "year": "",
+      "rol": "Técnico de iluminación (gaffer)",
+      "descripcion": "",
+      "nota": "Cortometraje no disponible íntegro en abierto. Se enlaza la pieza publicada por el Gobierno de Navarra.",
       "preview": 5,
-      "director": "",
-      "productora": "",
-      "year": "",
-      "rol": "Técnico de iluminación (gaffer)",
-      "descripcion": "",
-      "nota": "Cortometraje no disponible íntegro en abierto. Se enlaza la pieza publicada por el Gobierno de Navarra."
-    },
-    {
-      "slug": "timeless",
-      "titulo": "Timeless",
-      "tipo": "",
-      "artista": "The Weeknd, Playboi Carti",
-      "youtube": "5EpyN_6dqyk",
-      "link": "https://www.youtube.com/watch?v=5EpyN_6dqyk",
-      "director": "",
-      "productora": "",
-      "year": "",
-      "rol": "Técnico de iluminación (gaffer)",
-      "descripcion": "",
-      "nota": ""
+      "thumb": "assets/img/proyectos/lo-que-queda-todavia.jpg"
     }
   ]
 };
