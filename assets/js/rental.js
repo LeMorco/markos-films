@@ -37,15 +37,6 @@ window.RENTAL = {
   ],
   "material": [
     {
-      "id": "I001",
-      "codigo": "I001",
-      "nombre": "Aadasd",
-      "categoria": "iluminacion",
-      "unidades": 1,
-      "notas": "",
-      "foto": "assets/img/material/I001-20261117-b83c.jpg"
-    },
-    {
       "id": "A001",
       "codigo": "A001",
       "nombre": "GVM 1200B AIO",
