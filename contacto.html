@@ -34,21 +34,21 @@
 </nav>
 
 <section class="contact">
-  <p class="label" style="margin-bottom:1.4rem;">Contacto</p>
-  <h1 data-txt="contacto_titulo">Hablemos de tu proyecto</h1>
-  <a class="mail" href="mailto:markosfilms1@gmail.com">markosfilms1@gmail.com</a>
+  <p class="label" style="margin-bottom:1.4rem;" data-contacto="etiqueta">Contacto</p>
+  <h1 data-contacto="titulo">Hablemos de tu proyecto</h1>
+  <a class="mail" data-contacto="email" href="mailto:markosfilms1@gmail.com">markosfilms1@gmail.com</a>
   <div class="contact-grid">
     <div>
-      <h3>Encargos</h3>
-      <p>Iluminación para cine, publicidad y videoclip.</p>
+      <h3 data-contacto="encargos_titulo">Encargos</h3>
+      <p data-contacto="encargos_texto">Iluminación para cine, publicidad y videoclip.</p>
     </div>
     <div>
-      <h3>Alquiler</h3>
-      <a href="alquiler.html">Solicitar material &#8594;</a>
+      <h3 data-contacto="alquiler_titulo">Alquiler</h3>
+      <a data-contacto="alquiler_texto" href="alquiler.html">Solicitar material &#8594;</a>
     </div>
     <div>
-      <h3>Redes</h3>
-      <a href="https://www.instagram.com/marcoss_donate/" target="_blank" rel="noopener">Instagram &#8594;</a>
+      <h3 data-contacto="redes_titulo">Redes</h3>
+      <a data-contacto="instagram_texto" data-contacto-href="instagram" href="https://www.instagram.com/marcoss_donate/" target="_blank" rel="noopener">Instagram &#8594;</a>
     </div>
   </div>
 </section>
@@ -56,13 +56,14 @@
 <footer>
   <span>&copy; 2026 Marcos Donate</span>
   <div class="footer-links">
-    <a href="https://www.instagram.com/marcoss_donate/" target="_blank" rel="noopener">Instagram</a>
-    <a href="mailto:markosfilms1@gmail.com">markosfilms1@gmail.com</a>
+    <a data-contacto-href="instagram" href="https://www.instagram.com/marcoss_donate/" target="_blank" rel="noopener">Instagram</a>
+    <a data-contacto="email" href="mailto:markosfilms1@gmail.com">markosfilms1@gmail.com</a>
   </div>
 </footer>
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/main.js"></script>
 <script src="assets/js/textos.js"></script>
+<script src="assets/js/contacto.js"></script>
 </body>
 </html>

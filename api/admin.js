@@ -36,7 +36,8 @@ const FICHEROS = {
   proyectos: { ruta: "assets/js/data.js", marca: "window.MARKOS", tipo: "js" },
   material: { ruta: "assets/js/rental.js", marca: "window.RENTAL", tipo: "js" },
   textos: { ruta: "content/textos.json", marca: null, tipo: "json" },
-  sobre: { ruta: "content/sobre-mi.json", marca: null, tipo: "json" }
+  sobre: { ruta: "content/sobre-mi.json", marca: null, tipo: "json" },
+  contacto: { ruta: "content/contacto.json", marca: null, tipo: "json" }
 };
 
 const COLA_CLIPS = "content/cola-clips.json";
@@ -47,8 +48,7 @@ const CLAVES_TEXTO = [
   "proyectos_titulo",
   "proyectos_intro",
   "alquiler_titulo",
-  "alquiler_intro",
-  "contacto_titulo"
+  "alquiler_intro"
 ];
 
 const intentos = new Map();
@@ -512,6 +512,28 @@ function normalizarSobre(datos) {
   return salida;
 }
 
+function normalizarContacto(datos) {
+  const salida = {
+    etiqueta: texto(datos && datos.etiqueta, 80),
+    titulo: texto(datos && datos.titulo, 160),
+    email: texto(datos && datos.email, 160),
+    encargos_titulo: texto(datos && datos.encargos_titulo, 80),
+    encargos_texto: texto(datos && datos.encargos_texto, 600),
+    alquiler_titulo: texto(datos && datos.alquiler_titulo, 80),
+    alquiler_texto: texto(datos && datos.alquiler_texto, 160),
+    redes_titulo: texto(datos && datos.redes_titulo, 80),
+    instagram_texto: texto(datos && datos.instagram_texto, 160),
+    instagram: texto(datos && datos.instagram, 240)
+  };
+  if (salida.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(salida.email)) {
+    throw new Error("El email de contacto no parece válido: " + salida.email);
+  }
+  if (salida.instagram && !/^https?:\/\//.test(salida.instagram)) {
+    throw new Error("El enlace de Instagram debe empezar por http:// o https://");
+  }
+  return salida;
+}
+
 /* --------------------------------- lectura de los ficheros --------------------------------- */
 
 function evaluarJs(fuente) {
@@ -554,11 +576,12 @@ async function cargar() {
     }
   }
 
-  const [proyectos, material, textos, sobre] = await Promise.all([
+  const [proyectos, material, textos, sobre, contacto] = await Promise.all([
     leer(FICHEROS.proyectos.ruta),
     leer(FICHEROS.material.ruta),
     leer(FICHEROS.textos.ruta),
-    leer(FICHEROS.sobre.ruta)
+    leer(FICHEROS.sobre.ruta),
+    leer(FICHEROS.contacto.ruta)
   ]);
 
   const markos = extraerJs(proyectos.texto, FICHEROS.proyectos.marca) || {};
@@ -577,6 +600,14 @@ async function cargar() {
       sobreDatos = JSON.parse(sobre.texto);
     } catch (e) {
       sobreDatos = {};
+    }
+  }
+  let contactoDatos = {};
+  if (contacto.texto) {
+    try {
+      contactoDatos = JSON.parse(contacto.texto);
+    } catch (e) {
+      contactoDatos = {};
     }
   }
 
@@ -611,7 +642,8 @@ async function cargar() {
       sha: material.sha
     },
     textos: { datos: textosPlanos, sha: textos.sha },
-    sobre: { datos: sobreDatos, sha: sobre.sha }
+    sobre: { datos: sobreDatos, sha: sobre.sha },
+    contacto: { datos: contactoDatos, sha: contacto.sha }
   };
 }
 
@@ -683,6 +715,23 @@ async function guardar(fichero, datos, baseSha) {
       contenido,
       actual.sha,
       "Panel: Sobre mí"
+    );
+    return { ok: true, commit: resultado.commit };
+  }
+
+  if (fichero === "contacto") {
+    const actual = await leerFichero(FICHEROS.contacto.ruta);
+    if (baseSha && actual.sha && baseSha !== actual.sha) {
+      throw new Error("CONFLICTO: la página de contacto ha cambiado desde que abriste el panel. Recarga.");
+    }
+    const limpios = normalizarContacto(datos.contacto);
+    const contenido = JSON.stringify(limpios, null, 2) + "\n";
+    if (contenido === actual.texto) return { sinCambios: true };
+    const resultado = await escribirFichero(
+      FICHEROS.contacto.ruta,
+      contenido,
+      actual.sha,
+      "Panel: página de contacto"
     );
     return { ok: true, commit: resultado.commit };
   }
@@ -1024,6 +1073,17 @@ async function publicar(datos, baseSha) {
       ficheros.push({ ruta: FICHEROS.sobre.ruta, contenido });
       titulos.push("Sobre mí");
       detalle.push("~ Sobre mí: foto, texto o contacto");
+    }
+  }
+
+  if (cambios.contacto) {
+    const actual = await leerFichero(FICHEROS.contacto.ruta);
+    const nuevos = normalizarContacto(cambios.contacto.datos);
+    const contenido = JSON.stringify(nuevos, null, 2) + "\n";
+    if (contenido !== actual.texto) {
+      ficheros.push({ ruta: FICHEROS.contacto.ruta, contenido });
+      titulos.push("contacto");
+      detalle.push("~ Contacto: titular, email o textos");
     }
   }
 

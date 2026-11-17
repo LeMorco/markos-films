@@ -10,7 +10,7 @@
   var estado = null;
   var tabActual = "proyectos";
   var sucio = false;
-  var pendiente = { proyectos: false, material: false, textos: false, sobre: false };
+  var pendiente = { proyectos: false, material: false, textos: false, sobre: false, contacto: false };
 
   var TEXTOS = [
     { clave: "hero_kicker", etiqueta: "Portada · antetítulo", ayuda: "La línea pequeña encima del titular del inicio." },
@@ -18,8 +18,7 @@
     { clave: "proyectos_titulo", etiqueta: "Proyectos · título", ayuda: "Cabecera de la página de proyectos." },
     { clave: "proyectos_intro", etiqueta: "Proyectos · entradilla", ayuda: "Párrafo bajo ese título.", largo: true },
     { clave: "alquiler_titulo", etiqueta: "Alquiler · título", ayuda: "Cabecera del catálogo." },
-    { clave: "alquiler_intro", etiqueta: "Alquiler · entradilla", ayuda: "Párrafo bajo ese título.", largo: true },
-    { clave: "contacto_titulo", etiqueta: "Contacto · título", ayuda: "Titular de la página de contacto." }
+    { clave: "alquiler_intro", etiqueta: "Alquiler · entradilla", ayuda: "Párrafo bajo ese título.", largo: true }
   ];
 
   var CAMPOS_PROYECTO = [
@@ -239,7 +238,7 @@
     try {
       estado = await api("load");
       estado.cargado = !(estado.errores && estado.errores.length);
-      pendiente = { proyectos: false, material: false, textos: false, sobre: false };
+      pendiente = { proyectos: false, material: false, textos: false, sobre: false, contacto: false };
       sucio = false;
       pintarTodo();
       pintarBarra();
@@ -272,6 +271,7 @@
     pintarMaterial();
     pintarTextos();
     pintarSobre();
+    pintarContacto();
     pintarAjustes();
     mostrarTab(tabActual);
   }
@@ -817,6 +817,50 @@
     }));
   }
 
+  /* --------------------------------- contacto --------------------------------- */
+
+  var CAMPOS_CONTACTO = [
+    { clave: "etiqueta", etiqueta: "Antetítulo", ayuda: "La línea pequeña encima del titular." },
+    { clave: "titulo", etiqueta: "Titular", ancho: true },
+    { clave: "email", etiqueta: "Email", tipo: "email", ancho: true, ayuda: "Se usa en el enlace de correo y en el pie de la página." },
+    { clave: "encargos_titulo", etiqueta: "Encargos · título" },
+    { clave: "encargos_texto", etiqueta: "Encargos · texto", ancho: true, largo: true },
+    { clave: "alquiler_titulo", etiqueta: "Alquiler · título" },
+    { clave: "alquiler_texto", etiqueta: "Alquiler · texto del enlace", ancho: true, ayuda: "El enlace siempre lleva al catálogo de alquiler." },
+    { clave: "redes_titulo", etiqueta: "Redes · título" },
+    { clave: "instagram_texto", etiqueta: "Redes · texto del enlace", ancho: true },
+    { clave: "instagram", etiqueta: "Instagram (URL)", tipo: "url", ancho: true }
+  ];
+
+  function pintarContacto() {
+    var lista = document.getElementById("lista-contacto");
+    if (!lista) return;
+    lista.innerHTML = "";
+    if (!estado.contacto) estado.contacto = { datos: {} };
+    var datos = estado.contacto.datos;
+    if (!datos || typeof datos !== "object") datos = estado.contacto.datos = {};
+
+    CAMPOS_CONTACTO.forEach(function (def) {
+      lista.appendChild(campo({
+        clave: "contacto_" + def.clave,
+        fichero: "contacto",
+        etiqueta: def.etiqueta,
+        ayuda: def.ayuda,
+        ancho: def.ancho,
+        tipo: def.largo ? "textarea" : (def.tipo || "text"),
+        largo: def.largo,
+        valor: datos[def.clave] || "",
+        onInput: function (v) { datos[def.clave] = v; }
+      }));
+    });
+
+    lista.appendChild(h("p", {
+      clase: "ayuda",
+      texto: "Si dejas un campo vacío se mantiene el contenido original de la página. " +
+        "Los enlaces vacíos no se muestran."
+    }));
+  }
+
   function pintarTextos() {
     var lista = document.getElementById("lista-textos");
     lista.innerHTML = "";
@@ -874,6 +918,7 @@
     if (pendiente.material) partes.push("catálogo");
     if (pendiente.textos) partes.push("textos");
     if (pendiente.sobre) partes.push("Sobre mí");
+    if (pendiente.contacto) partes.push("Contacto");
     if (!partes.length) {
       barra.hidden = true;
       sucio = false;
@@ -892,7 +937,7 @@
       );
       return;
     }
-    if (!pendiente.proyectos && !pendiente.material && !pendiente.textos && !pendiente.sobre) {
+    if (!pendiente.proyectos && !pendiente.material && !pendiente.textos && !pendiente.sobre && !pendiente.contacto) {
       toast("No hay cambios pendientes.", "error");
       return;
     }
@@ -928,6 +973,7 @@
     if (pendiente.material) cambios.material = { datos: estado.material.datos };
     if (pendiente.textos) cambios.textos = { datos: estado.textos.datos };
     if (pendiente.sobre) cambios.sobre = { datos: estado.sobre.datos };
+    if (pendiente.contacto) cambios.contacto = { datos: estado.contacto.datos };
 
     var boton = document.getElementById("btn-publicar");
     boton.disabled = true;
@@ -952,7 +998,7 @@
           "ok"
         );
       }
-      pendiente = { proyectos: false, material: false, textos: false, sobre: false };
+      pendiente = { proyectos: false, material: false, textos: false, sobre: false, contacto: false };
       sucio = false;
       pintarBarra();
       var fresco = await api("load");
@@ -967,7 +1013,7 @@
       if (error.codigo === 409) {
         toast("Recargando el contenido del repositorio…", "error");
         await cargarTodo();
-        pendiente = { proyectos: false, material: false, textos: false, sobre: false };
+        pendiente = { proyectos: false, material: false, textos: false, sobre: false, contacto: false };
         pintarBarra();
       }
     } finally {
@@ -980,7 +1026,7 @@
 
   document.getElementById("btn-descartar").addEventListener("click", async function () {
     if (!confirm("¿Descartar todos los cambios sin publicar?")) return;
-    pendiente = { proyectos: false, material: false, textos: false, sobre: false };
+    pendiente = { proyectos: false, material: false, textos: false, sobre: false, contacto: false };
     sucio = false;
     pintarBarra();
     await cargarTodo();

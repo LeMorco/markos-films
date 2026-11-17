@@ -11,7 +11,7 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 | `proyecto.html` | Ficha: función, tipo, dirección, productora/artista, año, vídeo y **proyectos parecidos** (`?p=slug`) |
 | `alquiler.html` | Catálogo interactivo con categorías, búsqueda, fotos, fichas y **solicitud de presupuesto** |
 | `sobre-mi.html` | Texto pendiente de completar |
-| `contacto.html` | Email, Instagram y acceso al alquiler |
+| `contacto.html` | Email, Instagram y acceso al alquiler, editables desde el panel |
 
 ## Movimiento e interacción
 
@@ -34,6 +34,8 @@ Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el
 - **`assets/img/proyectos/`** — miniaturas propias de los proyectos con vídeo fuera de YouTube.
 - **`assets/js/rental.js`** — catálogo: categorías y las 42 piezas con código, unidades y ficha.
 - **`assets/img/material/`** — foto de cada pieza, nombrada con su código (`A001.jpg`…).
+- **`content/contacto.json`** — titular, email, textos y enlace de Instagram de la página de contacto;
+  `assets/js/contacto.js` los aplica al cargar la página.
 - **`api/solicitud.js`** — función serverless que envía las solicitudes por Resend.
 
 ## Añadir un proyecto con solo la URL
@@ -65,15 +67,16 @@ Eso deja `assets/img/proyectos/lo-que-queda-todavia.jpg`, `assets/video/preview/
 
 ## Panel de edición (`/admin`)
 
-Página privada para cambiar el contenido sin tocar código: proyectos, catálogo de alquiler, textos fijos de las páginas, la página «Sobre mí» y datos de contacto.
+Página privada para cambiar el contenido sin tocar código: proyectos, catálogo de alquiler, textos fijos de las páginas, la página «Sobre mí», la página de Contacto y datos generales.
 
 Los cambios **se acumulan como borrador**: editas lo que quieras (la barra de abajo indica qué hay sin publicar) y al pulsar **Subir todos los cambios** se hace **un único commit** con todos los ficheros afectados (API de datos de Git: blobs + tree + commit + ref, un solo evento para Vercel), con un mensaje generado automáticamente del tipo «Panel: 1 proyecto nuevo, 2 editados · catálogo: 3 referencias actualizadas · 2 textos», y el detalle de cada cambio en el cuerpo del commit. «Descartar» vuelve a lo que hay en el repositorio.
 
-- `admin.html` — interfaz (login, pestañas de Proyectos, Material, Textos, Sobre mí y Ajustes).
+- `admin.html` — interfaz (login, pestañas de Proyectos, Material, Textos, Sobre mí, Contacto y Ajustes).
 - `assets/js/admin.js` — formularios y llamadas al panel.
 - `api/admin.js` — función serverless: sesión firmada por cookie, validación y commit vía API de GitHub. El token y la contraseña viven en el servidor, nunca en el navegador.
 - `content/textos.json` — literales editables; `assets/js/textos.js` los aplica sobre los elementos con `data-txt` al cargar cada página.
 - `content/sobre-mi.json` — texto, foto y contacto de «Sobre mí»; `assets/js/sobre-mi.js` los aplica al cargar la página.
+- `content/contacto.json` — titular, email, textos y enlace de Instagram de «Contacto»; `assets/js/contacto.js` los aplica al cargar la página.
 
 ### Configuración (una sola vez, en Vercel)
 

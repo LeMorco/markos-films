@@ -20,7 +20,7 @@
   <div class="acceso-caja">
     <p class="label">Marcos Donate</p>
     <h1>Panel de edición</h1>
-    <p class="acceso-texto">Entra para modificar proyectos, el catálogo de alquiler, los textos de la web y la página «Sobre mí». Los cambios se publican solos en un minuto.</p>
+    <p class="acceso-texto">Entra para modificar proyectos, el catálogo de alquiler, los textos de la web y las páginas «Sobre mí» y «Contacto». Los cambios se publican solos en un minuto.</p>
 
     <form id="form-login" autocomplete="on">
       <div class="campo">
@@ -51,6 +51,7 @@
       <button class="pestana" data-tab="material" role="tab">Material</button>
       <button class="pestana" data-tab="textos" role="tab">Textos</button>
       <button class="pestana" data-tab="sobre" role="tab">Sobre mí</button>
+      <button class="pestana" data-tab="contacto" role="tab">Contacto</button>
       <button class="pestana" data-tab="ajustes" role="tab">Ajustes</button>
     </div>
     <div class="barra-acciones">
@@ -138,6 +139,18 @@
         <div class="vista-botones"></div>
       </div>
       <div id="lista-sobre" class="lista"></div>
+    </section>
+
+    <!-- contacto -->
+    <section class="vista" data-vista="contacto" hidden>
+      <div class="vista-cabecera">
+        <div>
+          <h2>Contacto</h2>
+          <p class="ayuda">El titular, el email y los textos de la página de contacto. Los cambios se publican junto con el resto.</p>
+        </div>
+        <div class="vista-botones"></div>
+      </div>
+      <div id="lista-contacto" class="lista"></div>
     </section>
 
     <!-- ajustes -->
