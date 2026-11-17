@@ -190,6 +190,15 @@
     }
   });
 
+  document.getElementById("btn-recargar").addEventListener("click", async function () {
+    aviso("Recargando…");
+    await cargarTodo();
+    if (estado && estado.cargado) {
+      toast("Recargado: " + estado.proyectos.datos.length + " proyectos y " +
+        estado.material.datos.length + " referencias.", "ok");
+    }
+  });
+
   document.getElementById("btn-diagnostico").addEventListener("click", async function () {
     toast("Comprobando el servidor…");
     try {
@@ -228,8 +237,9 @@
     aviso("Cargando…");
     try {
       estado = await api("load");
+      estado.cargado = !(estado.errores && estado.errores.length);
       pintarTodo();
-      if (estado.errores && estado.errores.length) {
+      if (!estado.cargado) {
         marcarLimpio("No se pudo leer el contenido", "error");
         toast(
           "El panel no puede leer los datos del repositorio:\n" +
@@ -248,6 +258,12 @@
   }
 
   function pintarTodo() {
+    if (estado) {
+      estado.cargados = {
+        proyectos: estado.proyectos.datos.length,
+        material: estado.material.datos.length
+      };
+    }
     pintarProyectos();
     pintarMaterial();
     pintarTextos();
@@ -280,7 +296,12 @@
       lista.appendChild(fichaProyecto(proyecto, indice));
     });
     if (!estado.proyectos.datos.length) {
-      lista.appendChild(h("p", { clase: "ayuda", texto: "Todavía no hay proyectos." }));
+      lista.appendChild(h("p", {
+        clase: "ayuda",
+        texto: estado.cargado
+          ? "El repositorio no tiene proyectos ahora mismo."
+          : "No se han podido leer los proyectos del repositorio. Pulsa «Recargar»."
+      }));
     }
   }
 
@@ -620,9 +641,32 @@
   /* --------------------------------- guardado --------------------------------- */
 
   async function guardar(fichero) {
-    if (!estado) {
-      toast("Todavía no se han cargado los datos. Revisa el diagnóstico.", "error");
+    if (!estado || !estado.cargado) {
+      toast(
+        "No se han podido leer los datos del repositorio, así que no se guarda nada " +
+        "(así no se puede borrar contenido por accidente). Pulsa «Recargar» y, si sigue " +
+        "igual, «Diagnóstico».",
+        "error"
+      );
       return;
+    }
+
+    var confirmar = false;
+    var previos = estado.cargados || { proyectos: estado.proyectos.datos.length, material: estado.material.datos.length };
+    if (fichero === "proyectos" && estado.proyectos.datos.length < previos.proyectos) {
+      confirmar = confirm(
+        "Ahora mismo hay " + previos.proyectos + " proyectos en la web y vas a " +
+        "guardar " + estado.proyectos.datos.length + ". ¿Seguro que quieres borrar " +
+        (previos.proyectos - estado.proyectos.datos.length) + "?"
+      );
+      if (!confirmar) return;
+    }
+    if (fichero === "material" && estado.material.datos.length < previos.material) {
+      confirmar = confirm(
+        "Hay " + previos.material + " referencias en el catálogo y vas a guardar " +
+        estado.material.datos.length + ". ¿Seguro?"
+      );
+      if (!confirmar) return;
     }
     var cuerpo;
     if (fichero === "proyectos") {
@@ -630,14 +674,16 @@
         action: "save",
         fichero: "proyectos",
         datos: { general: estado.proyectos.general, proyectos: estado.proyectos.datos },
-        baseSha: estado.proyectos.sha
+        baseSha: estado.proyectos.sha,
+        confirmar: confirmar
       };
     } else if (fichero === "material") {
       cuerpo = {
         action: "save",
         fichero: "material",
         datos: { material: estado.material.datos },
-        baseSha: estado.material.sha
+        baseSha: estado.material.sha,
+        confirmar: confirmar
       };
     } else {
       cuerpo = {
@@ -666,6 +712,10 @@
       ["proyectos", "material", "textos"].forEach(function (clave) {
         if (fresco[clave]) estado[clave].sha = fresco[clave].sha;
       });
+      estado.cargados = {
+        proyectos: estado.proyectos.datos.length,
+        material: estado.material.datos.length
+      };
       toast("Cambios publicados. La web se actualiza en ~60 s.", "ok");
     } catch (error) {
       marcarLimpio(error.message, "error");

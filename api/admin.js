@@ -492,17 +492,28 @@ async function guardar(fichero, datos, baseSha) {
       throw new Error("CONFLICTO: el sitio ha cambiado desde que abriste el panel. Recarga.");
     }
     const markos = extraerJs(actual.texto, FICHEROS.proyectos.marca) || {};
+    const existentes = Array.isArray(markos.proyectos) ? markos.proyectos.length : 0;
+    const nuevos = normalizarProyectos(datos.proyectos);
+    if (existentes > 0 && nuevos.length < existentes && !datos.confirmar) {
+      throw new Error(
+        "PROTECCION: el panel intenta guardar " + nuevos.length + " proyectos y en el " +
+        "repositorio hay " + existentes + ". No se ha guardado nada. Recarga el panel; " +
+        "si de verdad quieres borrar fichas, vuelve a guardar y confirma el aviso."
+      );
+    }
     if (datos.general) {
       const nuevo = Object.assign({}, markos);
-      nuevo.nombre = texto(datos.general.nombre, 120) || markos.nombre;
-      nuevo.rol = texto(datos.general.rol, 120);
-      nuevo.email = texto(datos.general.email, 160);
-      nuevo.instagram = texto(datos.general.instagram, 240);
-      nuevo.base = texto(datos.general.base, 120);
-      nuevo.proyectos = normalizarProyectos(datos.proyectos);
+      // solo se tocan las claves que llegan en la petición
+      ["nombre", "rol", "email", "instagram", "base"].forEach((clave) => {
+        if (!Object.prototype.hasOwnProperty.call(datos.general, clave)) return;
+        const valor = texto(datos.general[clave], clave === "instagram" ? 240 : 160);
+        if (clave === "nombre" && !valor) return; // el nombre nunca se queda vacío
+        nuevo[clave] = valor;
+      });
+      nuevo.proyectos = nuevos;
       return escribir(fichero, actual, nuevo, "Panel: proyectos y datos generales");
     }
-    const nuevo = Object.assign({}, markos, { proyectos: normalizarProyectos(datos.proyectos) });
+    const nuevo = Object.assign({}, markos, { proyectos: nuevos });
     return escribir(fichero, actual, nuevo, "Panel: proyectos");
   }
 
@@ -513,9 +524,15 @@ async function guardar(fichero, datos, baseSha) {
     }
     const rental = extraerJs(actual.texto, FICHEROS.material.marca) || {};
     const categorias = Array.isArray(rental.categorias) ? rental.categorias : [];
-    const nuevo = Object.assign({}, rental, {
-      material: normalizarMaterial(datos.material, categorias)
-    });
+    const existentes = Array.isArray(rental.material) ? rental.material.length : 0;
+    const nuevos = normalizarMaterial(datos.material, categorias);
+    if (existentes > 0 && nuevos.length < existentes && !datos.confirmar) {
+      throw new Error(
+        "PROTECCION: el panel intenta guardar " + nuevos.length + " referencias y en el " +
+        "repositorio hay " + existentes + ". No se ha guardado nada. Recarga el panel."
+      );
+    }
+    const nuevo = Object.assign({}, rental, { material: nuevos });
     return escribir(fichero, actual, nuevo, "Panel: catálogo de alquiler");
   }
 
@@ -683,7 +700,7 @@ module.exports = async function handler(req, res) {
     return json(res, 400, { error: "Acción desconocida: " + accion });
   } catch (error) {
     const mensaje = String((error && error.message) || error);
-    const conflicto = mensaje.indexOf("CONFLICTO") === 0 || mensaje.indexOf("conflicto") > -1;
+    const conflicto = /^(CONFLICTO|PROTECCION)/.test(mensaje) || mensaje.indexOf("conflicto") > -1;
     return json(res, conflicto ? 409 : 500, { error: mensaje.replace(/^CONFLICTO:\s*/, "") });
   }
 };
