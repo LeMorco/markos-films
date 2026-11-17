@@ -1069,8 +1069,6 @@ async function publicar(datos, baseSha) {
   const ficheros = [];
   const titulos = [];
   const detalle = [];
-  let totalCola = null;
-  const colaAuto = [];
 
   if (cambios.proyectos) {
     const actual = await leerFichero(FICHEROS.proyectos.ruta);
@@ -1087,25 +1085,6 @@ async function publicar(datos, baseSha) {
     }
 
     const diff = diferir(viejos, nuevos, "slug");
-    const mapaViejos = new Map();
-    viejos.forEach((p) => { if (p && p.slug) mapaViejos.set(p.slug, p); });
-    nuevos.forEach((p) => {
-      const antes = mapaViejos.get(p.slug);
-      const cambioPreview = !antes ||
-        antes.preview !== p.preview || antes.previewFin !== p.previewFin;
-      if (!cambioPreview || p.preview == null) return;
-      const url = p.youtube
-        ? "https://www.youtube.com/watch?v=" + p.youtube
-        : /(?:facebook\.com|fb\.watch|fb\.me)/i.test(p.link || "")
-          ? p.link
-          : "";
-      if (!url) return;
-      const fin = p.previewFin != null && p.previewFin > p.preview
-        ? p.previewFin
-        : p.preview + 7;
-      if (fin - p.preview > 15) return;
-      colaAuto.push({ slug: p.slug, url, inicio: p.preview, fin });
-    });
     const nuevoObjeto = Object.assign({}, markos);
     let generalCambiado = false;
     if (cambios.proyectos.general) {
@@ -1203,44 +1182,15 @@ async function publicar(datos, baseSha) {
     }
   }
 
-  /* La vista previa se guarda en el mismo commit que los proyectos: así
-     GitHub Actions la genera al recibir el push, sin adelantarse a la
-     publicación ni provocar conflictos en el panel. */
-  if ((Array.isArray(datos.cola) && datos.cola.length) || colaAuto.length) {
-    const actual = await leerFichero(COLA_CLIPS);
-    const cola = leerCola(actual.texto);
-    const mapa = new Map();
-    cola.forEach((item) => {
-      if (item && item.slug) mapa.set(item.slug, item);
-    });
-    const nuevos = []
-      .concat(Array.isArray(datos.cola) ? datos.cola : [])
-      .concat(colaAuto)
-      .map(normalizarClip);
-    const mapaNuevos = new Map();
-    nuevos.forEach((item) => mapaNuevos.set(item.slug, item));
-    const unicos = Array.from(mapaNuevos.values());
-    unicos.forEach((item) => mapa.set(item.slug, item));
-    totalCola = mapa.size;
-    const contenido = JSON.stringify(Array.from(mapa.values()), null, 2) + "\n";
-    if (contenido !== actual.texto) {
-      ficheros.push({ ruta: COLA_CLIPS, contenido });
-      titulos.push(unicos.length +
-        (unicos.length === 1 ? " vista previa en cola" : " vistas previas en cola"));
-      unicos.forEach((item) => detalle.push("+ clip: " + item.slug +
-        (item.inicio != null ? " (" + item.inicio + "-" + item.fin + " s)" : "")));
-    }
-  }
-
   const conTitulo = titulos.filter(Boolean);
   if (!ficheros.length) {
-    return { sinCambios: true, mensaje: "No hay cambios que publicar", cola: totalCola };
+    return { sinCambios: true, mensaje: "No hay cambios que publicar" };
   }
 
   const mensaje = "Panel: " + (conTitulo.join(" · ") || "cambios de contenido");
   const cuerpo = detalle.length ? detalle.join("\n") : "";
   const resultado = await commitMultiple(ficheros, mensaje, cuerpo, baseSha);
-  return { ok: true, commit: resultado.commit, mensaje, ficheros: ficheros.length, detalle, cola: totalCola };
+  return { ok: true, commit: resultado.commit, mensaje, ficheros: ficheros.length, detalle };
 }
 
 /* ---------------------------------- handler ---------------------------------- */

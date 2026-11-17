@@ -15,6 +15,7 @@ if errorlevel 1 (
 
 echo.
 echo Generando los clips que hayas encolado en /admin ...
+echo Te preguntara los segundos de cada uno (ej. 1:20 - 1:27).
 echo.
 python tools\procesar_cola.py
 

@@ -9,8 +9,8 @@
 
    Opcional por proyecto: "preview": 30  -> segundo del vídeo por el
    que empieza la vista previa al pasar el ratón (por defecto 15).
-   "previewFin": 37 -> segundo final elegido en el panel; si falta se
-   usa preview + 7. El clip se genera online con GitHub Actions.
+   "previewFin": 37 -> segundo final del clip; lo rellena el script
+   local al descargar la vista previa.
    ============================================================ */
 window.MARKOS = {
   "nombre": "Marcos Donate",

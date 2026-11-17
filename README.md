@@ -16,7 +16,7 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 ## Movimiento e interacción
 
 - **Portadas rotatorias** en el inicio (5 fotogramas, 4 s cada uno, con barras de progreso clicables y pausa al pasar el ratón).
-- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. El tramo exacto se elige en `/admin` (desde/hasta) y GitHub Actions lo genera al publicar; ver **Vistas previas online** más abajo. Si prefieres generarlos manualmente o desde originales en buena calidad, también existen `python tools/make_previews.py` y `python tools/add_preview.py`.
+- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. El tramo exacto se elige al ejecutar el script local (ver **Vistas previas con el script local** más abajo). También existen `python tools/make_previews.py` y `python tools/add_preview.py` para generar clips manualmente o desde originales en buena calidad.
 - **Revelado tipográfico**: los titulares suben desde una máscara al entrar en pantalla.
 - **Parallax** suave en las portadas del grid (solo escritorio).
 - **Scroll con inercia** en ratón/trackpad + **barra de progreso** en el borde derecho.
@@ -31,7 +31,7 @@ Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el
   El `tipo` se guarda normalizado (minúsculas, sin acentos ni plurales) para que «Videoclip»,
   «videoclip» y «Videoclips» sean una sola categoría y no dupliquen las pestañas del grid.
   Campos opcionales por proyecto: `preview` (segundo por el que empieza el clip del grid),
-  `previewFin` (segundo final elegido en el panel) y `thumb` (miniatura propia,
+  `previewFin` (segundo final; lo rellena el script local) y `thumb` (miniatura propia,
   p. ej. `assets/img/proyectos/<slug>.jpg`); si no hay `thumb`, la miniatura sale de YouTube a partir del id.
 - **`assets/img/proyectos/`** — miniaturas propias de los proyectos con vídeo fuera de YouTube.
 - **`assets/js/rental.js`** — catálogo: categorías y las 42 piezas con código, unidades y ficha.
@@ -47,32 +47,18 @@ En `/admin` → **Proyectos** hay un campo para pegar la URL de YouTube y pulsar
 - Saca el título y el artista del propio vídeo, genera el slug y guarda la ficha con el id, el enlace y la miniatura (la miniatura no se descarga: la web usa la de YouTube a partir del id, así que aparece sola en el grid y en la ficha).
 - Añade la ficha **al final** de la lista, sin tocar las que ya hay, y puedes completar tipo, año y descripción después.
 
-El **clip de vista previa** se genera online, sin ejecutar nada en tu ordenador:
+El **clip de vista previa** se genera en tu ordenador y se publica solo:
 
-1. En `/admin` → **Proyectos**, abre la ficha y elige **Vista previa · desde** y **Vista previa · hasta** (por ejemplo `1:20` y `1:27`).
-2. Pulsa **Subir todos los cambios**. El rango se guarda con el proyecto y se encola solo; el botón **Programar vista previa** sirve para comprobar el tramo y dejarlo preparado antes de publicar.
-3. Ese push incluye `content/cola-clips.json` y lanza el workflow `.github/workflows/preview-clips.yml`. GitHub Actions descarga el vídeo, corta **exactamente ese tramo**, genera la miniatura si falta, anota `preview`/`previewFin` en `data.js`, vacía la cola y publica el resultado con un commit `[preview-online]`. Vercel actualiza la web sola.
+1. En `/admin` → **Proyectos**, pulsa **Añadir vista previa a la cola** en la ficha que quieras (o añade un proyecto por URL con la casilla marcada). El panel solo guarda la URL y el slug; no hay que elegir segundos allí.
+2. En el ordenador, ejecuta `actualizar-clips.bat` (o `python tools/procesar_cola.py`).
+3. El script te pregunta el tramo de cada clip, por ejemplo:
 
-El rango admite segundos (`80`) o `mm:ss` (`1:20`) y puede durar como máximo 15 s; para la vista previa se recomiendan 7 (de `1:20` a `1:27`).
+   ```text
+   Segundos para «timeless» (ej. 1:20 - 1:27, Enter = automático): 1:20 - 1:27
+   ```
 
-Si el workflow falla porque YouTube pide sesión en la IP del runner, añade uno de estos **secretos** en GitHub → Settings → Secrets and variables → Actions:
-
-| Secreto | Para qué |
-|---|---|
-| `YT_COOKIES` | contenido completo de un `cookies.txt` exportado del navegador |
-| `YT_PROXY` | proxy residencial si tu red o el vídeo lo necesitan |
-
-También puedes definir la variable `YTDLP_EXTRACTOR_ARGS` (por ejemplo `youtube:player_client=web_safari`) en **Variables**. Como último recurso, la cola sigue funcionando en local:
-
-```
-# doble clic en la raíz del repo
-actualizar-clips.bat
-
-# o por terminal
-python tools/procesar_cola.py
-```
-
-El script descarga cada vídeo hasta 1080p, corta el clip, lo guarda en `assets/video/preview/<slug>.mp4`, vacía la cola y hace commit + push. Vercel publica solo.
+   Acepta `1:20 - 1:27`, `80-87` o solo `80` (80 + 7 s). Si pulsas Enter, usa el tramo guardado o elige el más luminoso.
+4. Descarga el vídeo, corta **exactamente** esos segundos, genera la miniatura si falta, anota `preview`/`previewFin` en `data.js`, vacía la cola y hace commit + push. Vercel actualiza la web sola.
 
 Si la ficha no tiene id de YouTube sino un enlace de **Facebook** (caso de *Lo que queda todavía*), el panel encola esa URL tal cual y el mismo comando descarga, saca la miniatura y corta el clip. Para ese proyecto se generó con:
 
@@ -91,7 +77,7 @@ Los cambios **se acumulan como borrador**: editas lo que quieras (la barra de ab
 - `admin.html` — interfaz (login, pestañas de Proyectos, Material, Textos, Sobre mí, Contacto y Ajustes).
 - `assets/js/admin.js` — formularios y llamadas al panel.
 - `api/admin.js` — función serverless: sesión firmada por cookie, validación y commit vía API de GitHub. El token y la contraseña viven en el servidor, nunca en el navegador.
-- `.github/workflows/preview-clips.yml` — genera online las vistas previas en cola (rango desde/hasta) y las publica.
+- `tools/procesar_cola.py` — pregunta los segundos de cada vista previa en cola, descarga, corta y publica.
 - `content/textos.json` — literales editables; `assets/js/textos.js` los aplica sobre los elementos con `data-txt` al cargar cada página.
 - `content/sobre-mi.json` — texto, foto y contacto de «Sobre mí»; `assets/js/sobre-mi.js` los aplica al cargar la página.
 - `content/contacto.json` — titular, email, textos y enlace de Instagram de «Contacto»; `assets/js/contacto.js` los aplica al cargar la página.

@@ -51,8 +51,8 @@ def _comando(extra, orden=None):
             "--no-playlist", "--no-warnings", "--no-mtime",
             "-N", "1", "--retries", "20", "--fragment-retries", "20",
             "--retry-sleep", "3"]
-    # Opciones pensadas para el workflow de GitHub Actions (y también útiles
-    # en local): proxy residencial y/o cliente/extractor concreto de YouTube.
+    # Opciones opcionales para descargas difíciles (proxy, cliente de
+    # YouTube concreto) sin tener que tocar el comando a mano.
     proxy = os.environ.get("YTDLP_PROXY", "").strip()
     if proxy:
         base += ["--proxy", proxy]

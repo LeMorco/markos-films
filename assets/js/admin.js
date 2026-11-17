@@ -68,46 +68,6 @@
     return alias[limpio] || limpio;
   }
 
-  /* «1:20», «01:20,5» o «80» -> segundos; null si no es válido. */
-  function parseSegundos(valor) {
-    var bruto = String(valor == null ? "" : valor).trim().replace(",", ".");
-    if (!bruto) return null;
-    if (/^\d+(\.\d+)?$/.test(bruto)) return Math.round(Number(bruto));
-    var partes = bruto.split(":");
-    if (partes.length < 2 || partes.length > 3) return null;
-    if (!partes.every(function (p) { return /^\d+(\.\d+)?$/.test(p); })) return null;
-    var segundos = 0;
-    partes.forEach(function (p) { segundos = segundos * 60 + Number(p); });
-    return Math.round(segundos);
-  }
-
-  function formatearSegundos(segundos) {
-    var s = Math.max(0, Math.round(Number(segundos) || 0));
-    var h = Math.floor(s / 3600);
-    var m = Math.floor((s % 3600) / 60);
-    var r = s % 60;
-    var dos = function (n) { return String(n).padStart(2, "0"); };
-    return h ? h + ":" + dos(m) + ":" + dos(r) : m + ":" + dos(r);
-  }
-
-  function leerTramo(desde, hasta) {
-    var inicio = parseSegundos(desde);
-    var fin = parseSegundos(hasta);
-    if (inicio == null) {
-      throw new Error("Escribe el segundo inicial del clip, por ejemplo 1:20.");
-    }
-    if (fin == null) fin = inicio + 7;
-    if (fin <= inicio) {
-      throw new Error("El final (" + formatearSegundos(fin) +
-        ") debe ser mayor que el inicio (" + formatearSegundos(inicio) + ").");
-    }
-    if (fin - inicio > 15) {
-      throw new Error("El clip dura " + (fin - inicio) +
-        " s. El máximo es 15 s; para la vista previa se recomiendan 7 s (por ejemplo 1:20 – 1:27).");
-    }
-    return { inicio: inicio, fin: fin };
-  }
-
   function h(tag, props, hijos) {
     var el = document.createElement(tag);
     if (props) {
@@ -309,7 +269,6 @@
     try {
       estado = await api("load");
       estado.cargado = !(estado.errores && estado.errores.length);
-      estado.colaPendiente = [];
       estado.colaItems = Array.isArray(estado.colaItems) ? estado.colaItems : [];
       pendiente = { proyectos: false, material: false, textos: false, sobre: false, contacto: false };
       sucio = false;
@@ -375,27 +334,18 @@
     });
     var avisoCola = document.getElementById("aviso-cola");
     if (avisoCola) avisoCola.remove();
-    var colaPorSlug = {};
-    (estado.colaItems || []).forEach(function (c) { if (c && c.slug) colaPorSlug[c.slug] = c; });
-    (estado.colaPendiente || []).forEach(function (c) { if (c && c.slug) colaPorSlug[c.slug] = c; });
-    var enCola = Object.keys(colaPorSlug).length;
+    var cola = estado.colaItems || [];
+    var enCola = cola.length;
     if (enCola > 0) {
-      var detalleCola = Object.keys(colaPorSlug).map(function (slug) {
-        var c = colaPorSlug[slug];
-        return slug + (c.inicio != null
-          ? " (" + formatearSegundos(c.inicio) +
-            (c.fin != null ? "–" + formatearSegundos(c.fin) : "") + ")"
-          : "");
-      }).join(", ");
+      var detalleCola = cola.map(function (c) { return c.slug; }).join(", ");
       lista.insertBefore(
         h("p", {
           clase: "ayuda aviso-cola",
           id: "aviso-cola",
           texto:
             "Hay " + enCola + (enCola === 1 ? " vista previa" : " vistas previas") +
-            " en cola: " + detalleCola + ". Se generan online en GitHub Actions al pulsar " +
-            "«Subir todos los cambios» (~3 min). Si el workflow falla porque YouTube pide sesión, " +
-            "añade el secreto YT_COOKIES o usa actualizar-clips.bat como último recurso."
+            " en cola: " + detalleCola + ". Ejecuta actualizar-clips.bat en el ordenador: " +
+            "te preguntará los segundos exactos, descargará el clip y lo publicará."
         }),
         lista.firstChild
       );
@@ -456,14 +406,7 @@
       etiqueta: "Dirección de la ficha (slug)",
       ayuda: "Aparece en proyecto.html?p=… No lo cambies si ya has compartido el enlace.",
       valor: proyecto.slug || "",
-      onInput: function (valor) {
-        var previo = proyecto.slug;
-        proyecto.slug = valor;
-        /* si el clip ya estaba programado, que se guarde con el slug nuevo */
-        (estado.colaPendiente || []).forEach(function (c) {
-          if (c.slug === previo) c.slug = valor;
-        });
-      }
+      onInput: function (valor) { proyecto.slug = valor; }
     }));
 
     var botonClip = null;
@@ -475,86 +418,25 @@
         ? proyecto.link
         : "";
     if (urlClip) {
-      var inicioGuardado = parseSegundos(proyecto.preview);
-      var finGuardado = parseSegundos(proyecto.previewFin);
-      if (finGuardado == null && inicioGuardado != null) finGuardado = inicioGuardado + 7;
-
-      var idDesde = "clip_desde_" + indice + "_" + Math.random().toString(36).slice(2, 6);
-      var idHasta = "clip_hasta_" + indice + "_" + Math.random().toString(36).slice(2, 6);
-      var entradaDesde = h("input", {
-        id: idDesde, type: "text", inputmode: "numeric", placeholder: "1:20"
-      });
-      var entradaHasta = h("input", {
-        id: idHasta, type: "text", inputmode: "numeric", placeholder: "1:27"
-      });
-      if (inicioGuardado != null) entradaDesde.value = formatearSegundos(inicioGuardado);
-      if (finGuardado != null) entradaHasta.value = formatearSegundos(finGuardado);
-
-      /* Al escribir un tramo válido se guarda en el borrador: al publicar,
-         el servidor encola la vista previa automáticamente. */
-      var sincronizarRango = function () {
-        var ini = parseSegundos(entradaDesde.value);
-        var fin = parseSegundos(entradaHasta.value);
-        if (ini == null) return;
-        if (fin == null) fin = ini + 7;
-        if (fin <= ini || fin - ini > 15) return;
-        proyecto.preview = ini;
-        proyecto.previewFin = fin;
-        marcarSucio("proyectos");
-      };
-      entradaDesde.addEventListener("input", sincronizarRango);
-      entradaHasta.addEventListener("input", sincronizarRango);
-
-      cuerpo.appendChild(h("div", { clase: "campo-ancho rango-preview" }, [
-        h("div", { clase: "campo" }, [
-          h("label", { for: idDesde, texto: "Vista previa · desde" }),
-          entradaDesde
-        ]),
-        h("div", { clase: "campo" }, [
-          h("label", { for: idHasta, texto: "Vista previa · hasta" }),
-          entradaHasta
-        ]),
-        h("p", {
-          clase: "ayuda",
-          texto: "Escribe mm:ss o segundos. Ejemplo: desde 1:20 y hasta 1:27 genera un clip de 7 s. " +
-            "Se genera online en GitHub Actions al publicar; no hace falta ejecutar nada en tu ordenador. " +
-            "Máximo 15 s."
-        })
-      ]));
-
       botonClip = h("button", {
-        clase: "boton boton-mini", type: "button", texto: "Programar vista previa",
-        onclick: function () {
+        clase: "boton boton-mini", type: "button", texto: "Añadir vista previa a la cola",
+        onclick: async function () {
+          botonClip.disabled = true;
           try {
-            var tramo = leerTramo(entradaDesde.value, entradaHasta.value);
-            entradaDesde.value = formatearSegundos(tramo.inicio);
-            entradaHasta.value = formatearSegundos(tramo.fin);
-            proyecto.preview = tramo.inicio;
-            proyecto.previewFin = tramo.fin;
-
-            if (!estado.colaPendiente) estado.colaPendiente = [];
-            var item = {
-              slug: proyecto.slug,
+            await api("clip", {
+              action: "clip",
               url: urlClip,
-              inicio: tramo.inicio,
-              fin: tramo.fin
-            };
-            var existente = -1;
-            estado.colaPendiente.forEach(function (c, i) {
-              if (c.slug === item.slug) existente = i;
+              slug: proyecto.slug
             });
-            if (existente > -1) estado.colaPendiente[existente] = item;
-            else estado.colaPendiente.push(item);
-
-            marcarSucio("proyectos");
             toast(
-              "Vista previa programada: " + formatearSegundos(tramo.inicio) + " – " +
-                formatearSegundos(tramo.fin) + " («" + (proyecto.titulo || proyecto.slug) + "»).\n" +
-                "Pulsa «Subir todos los cambios»: GitHub generará el clip al recibir el push.",
+              "Vista previa en cola. Ejecuta actualizar-clips.bat en el ordenador: " +
+                "te pedirá los segundos exactos, descargará el clip y lo publicará.",
               "ok"
             );
           } catch (error) {
             toast(error.message, "error");
+          } finally {
+            botonClip.disabled = false;
           }
         }
       });
@@ -599,27 +481,16 @@
         toast("Ese vídeo ya está en el portfolio: «" + r.titulo + "».", "error");
         return;
       }
+      if (conClip) {
+        await api("clip", { action: "clip", url: url, slug: r.proyecto.slug });
+      }
       entrada.value = "";
       await cargarTodo();
-      if (conClip) {
-        var nuevo = estado.proyectos.datos.filter(function (p) {
-          return p.slug === r.proyecto.slug;
-        })[0];
-        var urlClip = nuevo && nuevo.youtube
-          ? "https://www.youtube.com/watch?v=" + nuevo.youtube
-          : nuevo && /(?:facebook\.com|fb\.watch|fb\.me)/i.test(nuevo.link || "")
-            ? nuevo.link
-            : "";
-        if (urlClip) {
-          estado.colaPendiente.push({ slug: r.proyecto.slug, url: urlClip });
-          marcarSucio("proyectos");
-        }
-      }
       marcarLimpio("Proyecto añadido", "ok");
       toast(
         "«" + r.proyecto.titulo + "» añadido como " + r.proyecto.slug + "." +
           (conClip
-            ? "\nVista previa programada: pulsa «Subir todos los cambios» para que GitHub la genere online."
+            ? "\nVista previa en cola: ejecuta actualizar-clips.bat y te pedirá los segundos."
             : ""),
         "ok"
       );
@@ -1113,8 +984,7 @@
       );
       return;
     }
-    var tieneCola = estado.colaPendiente && estado.colaPendiente.length > 0;
-    if (!pendiente.proyectos && !pendiente.material && !pendiente.textos && !pendiente.sobre && !pendiente.contacto && !tieneCola) {
+    if (!pendiente.proyectos && !pendiente.material && !pendiente.textos && !pendiente.sobre && !pendiente.contacto) {
       toast("No hay cambios pendientes.", "error");
       return;
     }
@@ -1141,7 +1011,7 @@
     }
 
     var cambios = {};
-    if (pendiente.proyectos || tieneCola) {
+    if (pendiente.proyectos) {
       cambios.proyectos = {
         general: estado.proyectos.general,
         datos: estado.proyectos.datos
@@ -1160,7 +1030,6 @@
       var resultado = await api("publicar", {
         action: "publicar",
         cambios: cambios,
-        cola: tieneCola ? estado.colaPendiente : undefined,
         baseSha: estado.cabeza || null,
         confirmar: confirmar
       });
@@ -1172,15 +1041,11 @@
         toast(
           "Publicado en un solo commit (" + resultado.commit + "):\n" +
             (resultado.mensaje || "") +
-            (tieneCola
-              ? "\n\nGitHub Actions generará la vista previa online en unos minutos. No cierres nada: " +
-                "la web se actualiza sola cuando termine."
-              : "\n\nLa web se actualiza en ~60 s."),
+            "\n\nLa web se actualiza en ~60 s.",
           "ok"
         );
       }
       pendiente = { proyectos: false, material: false, textos: false, sobre: false, contacto: false };
-      estado.colaPendiente = [];
       sucio = false;
       pintarBarra();
       var fresco = await api("load");

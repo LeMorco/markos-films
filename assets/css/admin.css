@@ -111,8 +111,6 @@ body.admin{background:var(--bg);}
 .ficha:not(.abierta) .ficha-cuerpo{display:none;}
 .ficha-cuerpo .campo-ancho{grid-column:1/-1;}
 .ficha-acciones{grid-column:1/-1;display:flex;justify-content:space-between;gap:0.6rem;flex-wrap:wrap;}
-.rango-preview{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0.9rem;align-items:end;}
-.rango-preview .ayuda{grid-column:1/-1;margin:0;}
 
 /* ------------------------------ material ------------------------------ */
 .material-ficha .ficha-cabecera{display:grid;grid-template-columns:64px 1fr auto;gap:0.9rem;align-items:center;}
