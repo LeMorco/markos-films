@@ -173,20 +173,6 @@ window.MARKOS = {
       "nota": "Cortometraje no disponible íntegro en abierto. Se enlaza la pieza publicada por el Gobierno de Navarra."
     },
     {
-      "slug": "nuevo-proyecto-12",
-      "titulo": "Prueba desde admin",
-      "tipo": "",
-      "artista": "",
-      "youtube": "Pruebaprueba",
-      "link": "https://youtu.be/RaVcgee5a5A",
-      "director": "",
-      "productora": "",
-      "year": "",
-      "rol": "Técnico de iluminación (gaffer)",
-      "descripcion": "",
-      "nota": ""
-    },
-    {
       "slug": "timeless",
       "titulo": "Timeless",
       "tipo": "",
