@@ -660,6 +660,13 @@ function idYoutube(url) {
   return m[1];
 }
 
+function idFacebook(url) {
+  const m = /\/videos\/(?:[^/?#]+\/)?(\d+)/.exec(String(url || "")) ||
+    /[?&]v=(\d+)/.exec(String(url || ""));
+  if (!m) return null;
+  return m[1];
+}
+
 async function datosYoutube(vid) {
   const enlace = "https://www.youtube.com/watch?v=" + vid;
   const salida = { vid, enlace, titulo: "", autor: "", miniatura: "" };
@@ -785,8 +792,9 @@ async function subirImagen(datos) {
 async function encolarClip(datos) {
   const url = texto(datos.url, 300);
   const vid = idYoutube(url);
-  if (!vid) throw new Error("Esa URL no parece de YouTube");
-  const nombre = slug(datos.slug) || slug("clip-" + vid);
+  const fb = vid ? null : idFacebook(url);
+  if (!vid && !fb) throw new Error("Esa URL no parece de YouTube ni de Facebook");
+  const nombre = slug(datos.slug) || slug("clip-" + (vid || fb));
 
   const actual = await leerFichero(COLA_CLIPS);
   let cola = [];
@@ -801,7 +809,7 @@ async function encolarClip(datos) {
   cola = cola.filter((c) => c && c.slug !== nombre);
   cola.push({
     slug: nombre,
-    url: "https://www.youtube.com/watch?v=" + vid,
+    url: vid ? "https://www.youtube.com/watch?v=" + vid : url,
     inicio: datos.inicio == null ? null : Math.max(0, parseInt(datos.inicio, 10) || 0)
   });
 

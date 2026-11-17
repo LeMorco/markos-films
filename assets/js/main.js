@@ -54,6 +54,8 @@
     return String(p.artista || "").split("·")[0].trim();
   }
   function thumb(p) {
+    /* miniatura propia (p. ej. de un vídeo de Facebook) o la de YouTube */
+    if (p.thumb) return p.thumb;
     return p.youtube ? "https://i.ytimg.com/vi/" + p.youtube + "/maxresdefault.jpg" : "";
   }
   function cardHTML(p) {
@@ -68,9 +70,12 @@
           (p.artista ? '<span class="card-client">' + esc(artistaCorto(p)) + "</span>" : "") +
         "</div></a>";
     }
+    var fallback = p.youtube
+      ? ' onerror="this.onerror=null;this.src=\'https://i.ytimg.com/vi/' + p.youtube + '/hqdefault.jpg\'"'
+      : "";
     var inner =
       '<div class="card-media">' +
-        '<img src="' + t + '" alt="' + esc(p.titulo) + '" loading="lazy" onerror="this.onerror=null;this.src=\'https://i.ytimg.com/vi/' + p.youtube + '/hqdefault.jpg\'">' +
+        '<img src="' + t + '" alt="' + esc(p.titulo) + '" loading="lazy"' + fallback + '>' +
       "</div>" +
       '<div class="card-body">' +
         '<span class="card-type">' + esc(tipoLabel(p.tipo)) + "</span>" +
@@ -258,7 +263,7 @@
       var vwrap = document.getElementById("pj-video");
       if (p.youtube) {
         vwrap.innerHTML =
-          '<div class="video-poster" id="pj-poster" style="background-image:url(https://i.ytimg.com/vi/' + p.youtube + '/maxresdefault.jpg)" role="button" tabindex="0" aria-label="Reproducir ' + esc(p.titulo) + '">' +
+          '<div class="video-poster" id="pj-poster" style="background-image:url(' + thumb(p) + ')" role="button" tabindex="0" aria-label="Reproducir ' + esc(p.titulo) + '">' +
             '<span class="play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></span>' +
           "</div>";
         var play = function () {
@@ -271,6 +276,11 @@
         poster.addEventListener("keydown", function (e) {
           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); play(); }
         });
+      } else if (thumb(p)) {
+        /* sin reproductor incrustado (Facebook, Vimeo…): se muestra la
+           miniatura propia y el enlace externo queda debajo */
+        vwrap.innerHTML = '<img src="' + thumb(p) + '" alt="' + esc(p.titulo) +
+          '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;">';
       } else {
         vwrap.innerHTML = "";
         vwrap.style.display = "none";

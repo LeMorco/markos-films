@@ -27,6 +27,12 @@ FORMATO = ("bv*[height<=1080][vcodec^=avc1]+ba[ext=m4a]/"
            "bv*[height<=1080]+ba/"
            "b[height<=1080]/b")
 
+# En Facebook (y otras redes) el vídeo puede venir en vertical: 1080x1920 tiene
+# 1920 de alto y el filtro de arriba se quedaría en 960. Ahí se ordena por
+# resolución del lado corto, que es lo mismo para horizontal y para vertical.
+FORMATO_REDES = "bv*+ba/b/bv*"
+ORDEN_REDES = "res:1080,vcodec:h264"
+
 
 def ffmpeg():
     try:
@@ -39,12 +45,15 @@ def ffmpeg():
         return ruta
 
 
-def _comando(extra):
-    return [sys.executable, "-m", "yt_dlp",
+def _comando(extra, orden=None):
+    base = [sys.executable, "-m", "yt_dlp",
             "--ffmpeg-location", ffmpeg(),
             "--no-playlist", "--no-warnings", "--no-mtime",
             "-N", "1", "--retries", "20", "--fragment-retries", "20",
-            "--retry-sleep", "3"] + extra
+            "--retry-sleep", "3"]
+    if orden:
+        base += ["-S", orden]
+    return base + extra
 
 
 def _resolucion(ff, ruta):
@@ -57,13 +66,15 @@ def _resolucion(ff, ruta):
     return int(m.group(1)), int(m.group(2))
 
 
-def descargar(url, destino_sin_ext, intentos=2, cookies=None, cookies_file=None):
+def descargar(url, destino_sin_ext, intentos=2, cookies=None, cookies_file=None,
+              formato=FORMATO, orden=None):
     """
-    Descarga el vídeo (hasta 1080p) en `destino_sin_ext` + extensión.
+    Descarga el vídeo en `destino_sin_ext` + extensión.
 
     Devuelve (ruta, ancho, alto); (None, 0, 0) si no se ha podido.
     `cookies` es un navegador ("chrome", "edge"...) y `cookies_file` un
-    cookies.txt exportado (la vía fiable en Windows).
+    cookies.txt exportado (la vía fiable en Windows). Para vídeos verticales
+    (Facebook) conviene pasar FORMATO_REDES y ORDEN_REDES.
     """
     ff = ffmpeg()
     os.makedirs(os.path.dirname(destino_sin_ext) or ".", exist_ok=True)
@@ -78,10 +89,10 @@ def descargar(url, destino_sin_ext, intentos=2, cookies=None, cookies_file=None)
 
     error = ""
     for intento in range(1, intentos + 1):
-        orden = _comando(extra + [
-            "-f", FORMATO, "--merge-output-format", "mp4",
-            "-o", destino_sin_ext + ".%(ext)s", url])
-        r = subprocess.run(orden, capture_output=True, text=True)
+        orden_cmd = _comando(extra + [
+            "-f", formato, "--merge-output-format", "mp4",
+            "-o", destino_sin_ext + ".%(ext)s", url], orden=orden)
+        r = subprocess.run(orden_cmd, capture_output=True, text=True)
         if r.returncode == 0:
             ficheros = sorted(f for f in os.listdir(carpeta)
                               if f.startswith(prefijo)

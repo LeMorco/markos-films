@@ -41,10 +41,12 @@ SALIDA = os.path.join(RAIZ, "assets", "video", "preview")
 
 
 def proyectos():
-    """(slug, id de YouTube, segundo de inicio) de cada proyecto.
+    """(slug, id de YouTube, segundo de inicio, enlace) de cada proyecto.
 
     Sirve tanto para data.js escrito a mano (claves sin comillas) como para el
     que reescribe el panel (/admin), que las deja entrecomilladas como JSON.
+    `youtube` puede venir vacío (por ejemplo, un vídeo de Facebook): en ese
+    caso el enlace es la única pista para emparejarlo con su URL.
     """
     src = open(os.path.join(RAIZ, "assets", "js", "data.js"), encoding="utf-8").read()
     marcas = list(re.finditer(r'["\']?slug["\']?\s*:\s*"([^"]+)"', src))
@@ -53,8 +55,11 @@ def proyectos():
         bloque = src[marca.end():final]
         yt = re.search(r'["\']?youtube["\']?\s*:\s*"([^"]*)"', bloque)
         pv = re.search(r'["\']?preview["\']?\s*:\s*(\d+)', bloque)
-        if yt and yt.group(1).strip():
-            yield marca.group(1), yt.group(1).strip(), int(pv.group(1)) if pv else None
+        enlace = re.search(r'["\']?link["\']?\s*:\s*"([^"]*)"', bloque)
+        yield (marca.group(1),
+               yt.group(1).strip() if yt else "",
+               int(pv.group(1)) if pv else None,
+               enlace.group(1).strip() if enlace else "")
 
 
 EXTENSIONES = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".mts", ".m2ts", ".mpg", ".mpeg", ".wmv")
@@ -139,8 +144,14 @@ def main():
     lista = maestros(args.local) if args.local else None
     usados = set()
 
-    for slug, vid, inicio in proyectos():
+    for slug, vid, inicio, _ in proyectos():
         destino = os.path.join(SALIDA, slug + ".mp4")
+        if not vid:
+            # sin id de YouTube (Facebook, Vimeo…): lo resuelve add_preview.py
+            # con su enlace, aquí no hay nada que descargar.
+            print("sin youtube, se omite:", slug)
+            continue
+
         if os.path.exists(destino) and not args.force:
             print("ya existe:", slug)
             continue

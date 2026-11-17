@@ -165,6 +165,8 @@ window.MARKOS = {
       "artista": "Shortzinema 2026",
       "youtube": "",
       "link": "https://www.facebook.com/culturagobiernodenavarra/videos/1569445758286819/",
+      "thumb": "assets/img/proyectos/lo-que-queda-todavia.jpg",
+      "preview": 5,
       "director": "",
       "productora": "",
       "year": "",

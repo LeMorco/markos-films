@@ -3,8 +3,8 @@
 Procesa la cola de clips que deja el panel (/admin).
 
 El panel no puede descargar de YouTube (Vercel y GitHub Actions reciben el
-bloqueo "Sign in to confirm you're not a bot"), así que la descarga se hace
-en tu ordenador, que sí puede. Este script:
+bloqueo "Sign in to confirm you're not a bot") ni de Facebook, así que la
+descarga se hace en tu ordenador, que sí puede. Este script:
 
     1. lee content/cola-clips.json (lo que hayas encolado desde el panel)
     2. descarga cada vídeo y corta su clip de 7 s (usa add_preview.py)

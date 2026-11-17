@@ -16,7 +16,7 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 ## Movimiento e interacción
 
 - **Portadas rotatorias** en el inicio (5 fotogramas, 4 s cada uno, con barras de progreso clicables y pausa al pasar el ratón).
-- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. Al salir se descarga. Para añadir un proyecto nuevo, ejecuta `python tools/make_previews.py` (ver cabecera del script). Si tienes los vídeos originales en buena calidad, déjalos en `tools/maestros/` (nombre con el slug o el id de YouTube) y genera los clips desde ahí, sin pasar por YouTube: `python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19`. Esa carpeta está en `.gitignore`. Para uno o varios proyectos sueltos hay un atajo que hace todo (descarga cada original hasta 1080p en H.264, elige el tramo, corta el clip mudo y lo publica): `python tools/add_preview.py <url> [<url> ...]`. Si el vídeo todavía no está en `data.js`, deduce el slug a partir del título y te recuerda añadir la ficha. Opciones útiles: `--inicio 42` fija el segundo del clip, `--guardar-master` deja también el vídeo completo en `tools/maestros/` (no va al repo), `--no-push` corta el clip sin publicar y `--cookies-file cookies.txt` si YouTube pide sesión. La descarga va con una sola conexión porque YouTube devuelve 403 al pedir fragmentos en paralelo sin sesión.
+- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. Al salir se descarga. Para añadir un proyecto nuevo, ejecuta `python tools/make_previews.py` (ver cabecera del script). Si tienes los vídeos originales en buena calidad, déjalos en `tools/maestros/` (nombre con el slug o el id de YouTube) y genera los clips desde ahí, sin pasar por YouTube: `python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19`. Esa carpeta está en `.gitignore`. Para uno o varios proyectos sueltos hay un atajo que hace todo (descarga cada original hasta 1080p en H.264, elige el tramo, saca la **miniatura** en `assets/img/proyectos/<slug>.jpg`, corta el clip mudo y lo publica): `python tools/add_preview.py <url> [<url> ...]`. La URL puede ser de **YouTube o de Facebook** (los vídeos públicos de Facebook no necesitan sesión; los verticales se enmarcan en 16:9 con fondo desenfocado, porque la web usa tarjetas horizontales). Si el vídeo todavía no está en `data.js`, deduce el slug a partir del título y te recuerda añadir la ficha. Opciones útiles: `--inicio 42` fija el segundo del clip, `--miniatura-segundo 1` elige otro fotograma para la miniatura (el 1 suele coger el rótulo del título), `--guardar-master` deja también el vídeo completo en `tools/maestros/` (no va al repo), `--no-push` corta el clip sin publicar y `--cookies-file cookies.txt` si YouTube o Facebook piden sesión. La descarga va con una sola conexión porque YouTube devuelve 403 al pedir fragmentos en paralelo sin sesión.
 - **Revelado tipográfico**: los titulares suben desde una máscara al entrar en pantalla.
 - **Parallax** suave en las portadas del grid (solo escritorio).
 - **Scroll con inercia** en ratón/trackpad + **barra de progreso** en el borde derecho.
@@ -28,6 +28,10 @@ Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el
 
 - **`assets/js/data.js`** — datos generales (nombre, email, Instagram) y proyectos.
   Los campos vacíos (`director`, `productora`, `year`, `descripcion`) se muestran como «Por confirmar».
+  Campos opcionales por proyecto: `preview` (segundo por el que empieza el clip del grid) y
+  `thumb` (miniatura propia, p. ej. `assets/img/proyectos/<slug>.jpg`); si no hay `thumb`,
+  la miniatura sale de YouTube a partir del id.
+- **`assets/img/proyectos/`** — miniaturas propias de los proyectos con vídeo fuera de YouTube.
 - **`assets/js/rental.js`** — catálogo: categorías y las 42 piezas con código, unidades y ficha.
 - **`assets/img/material/`** — foto de cada pieza, nombrada con su código (`A001.jpg`…).
 - **`api/solicitud.js`** — función serverless que envía las solicitudes por Resend.
@@ -50,6 +54,14 @@ python tools/procesar_cola.py
 ```
 
 El script descarga cada vídeo hasta 1080p, corta el clip, lo guarda en `assets/video/preview/<slug>.mp4`, vacía la cola y hace commit + push. Vercel publica solo.
+
+Si la ficha no tiene id de YouTube sino un enlace de **Facebook** (caso de *Lo que queda todavía*), el panel encola esa URL tal cual y el mismo comando descarga, saca la miniatura y corta el clip. Para ese proyecto se generó con:
+
+```
+python tools/add_preview.py "https://www.facebook.com/culturagobiernodenavarra/videos/1569445758286819/" --inicio 5 --miniatura-segundo 1 --guardar-master
+```
+
+Eso deja `assets/img/proyectos/lo-que-queda-todavia.jpg`, `assets/video/preview/lo-que-queda-todavia.mp4` y anota `thumb` y `preview` en `data.js`. Al ser un vídeo vertical, la miniatura y el clip van enmarcados en 16:9 con el fondo desenfocado.
 
 ## Panel de edición (`/admin`)
 

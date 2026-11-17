@@ -307,8 +307,8 @@
           clase: "ayuda aviso-cola",
           id: "aviso-cola",
           texto:
-            "Hay " + estado.cola + " clip(s) en cola. Los descarga tu ordenador (YouTube bloquea " +
-            "a Vercel y a GitHub): haz doble clic en actualizar-clips.bat en la carpeta del proyecto " +
+            "Hay " + estado.cola + " clip(s) en cola. Los descarga tu ordenador (YouTube y Facebook " +
+            "bloquean a Vercel y a GitHub): haz doble clic en actualizar-clips.bat en la carpeta del proyecto " +
             "y se generan y publican solos."
         }),
         lista.firstChild
@@ -364,7 +364,14 @@
     }));
 
     var botonClip;
-    if (proyecto.youtube) {
+    /* YouTube por id; si el vídeo es de Facebook (u otra red con enlace
+       directo), se encola su URL tal cual. */
+    var urlClip = proyecto.youtube
+      ? "https://www.youtube.com/watch?v=" + proyecto.youtube
+      : /(?:facebook\.com|fb\.watch|fb\.me)/i.test(proyecto.link || "")
+        ? proyecto.link
+        : "";
+    if (urlClip) {
       botonClip = h("button", {
         clase: "boton boton-mini", type: "button", texto: "Generar clip de 7 s",
         onclick: async function () {
@@ -372,7 +379,7 @@
           try {
             await api("clip", {
               action: "clip",
-              url: "https://www.youtube.com/watch?v=" + proyecto.youtube,
+              url: urlClip,
               slug: proyecto.slug,
               inicio: proyecto.preview == null ? null : proyecto.preview
             });
