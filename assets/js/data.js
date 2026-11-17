@@ -14,7 +14,7 @@ window.MARKOS = {
   "nombre": "Marcos Donate",
   "rol": "Técnico de iluminación",
   "email": "markosfilms1@gmail.com",
-  "instagram": "https://www.instagram.com/markosfilms/",
+  "instagram": "https://www.instagram.com/marcoss_donate/",
   "base": "Navarra, España",
   "formEndpoint": "/api/solicitud",
   "proyectos": [

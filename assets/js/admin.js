@@ -10,7 +10,7 @@
   var estado = null;
   var tabActual = "proyectos";
   var sucio = false;
-  var pendiente = { proyectos: false, material: false, textos: false };
+  var pendiente = { proyectos: false, material: false, textos: false, sobre: false };
 
   var TEXTOS = [
     { clave: "hero_kicker", etiqueta: "Portada · antetítulo", ayuda: "La línea pequeña encima del titular del inicio." },
@@ -19,13 +19,7 @@
     { clave: "proyectos_intro", etiqueta: "Proyectos · entradilla", ayuda: "Párrafo bajo ese título.", largo: true },
     { clave: "alquiler_titulo", etiqueta: "Alquiler · título", ayuda: "Cabecera del catálogo." },
     { clave: "alquiler_intro", etiqueta: "Alquiler · entradilla", ayuda: "Párrafo bajo ese título.", largo: true },
-    { clave: "contacto_titulo", etiqueta: "Contacto · título", ayuda: "Titular de la página de contacto." },
-    { clave: "sobre_titulo", etiqueta: "Sobre mí · título", ayuda: "Cabecera de la página «Sobre mí»." },
-    { clave: "sobre_bio", etiqueta: "Sobre mí · presentación", ayuda: "Párrafo de presentación, junto al retrato.", largo: true },
-    { clave: "sobre_trayectoria", etiqueta: "Sobre mí · trayectoria", ayuda: "Texto del bloque «Trayectoria».", largo: true },
-    { clave: "sobre_servicios", etiqueta: "Sobre mí · servicios", ayuda: "Texto del bloque «Servicios».", largo: true },
-    { clave: "sobre_equipo", etiqueta: "Sobre mí · equipo propio", ayuda: "Texto del bloque «Equipo propio».", largo: true },
-    { clave: "sobre_contacto", etiqueta: "Sobre mí · contacto directo", ayuda: "Email del bloque «Contacto directo». También actualiza el enlace de correo." }
+    { clave: "contacto_titulo", etiqueta: "Contacto · título", ayuda: "Titular de la página de contacto." }
   ];
 
   var CAMPOS_PROYECTO = [
@@ -66,7 +60,7 @@
     var id = "f_" + opciones.clave + "_" + Math.random().toString(36).slice(2, 7);
     var control;
     if (opciones.tipo === "textarea") {
-      control = h("textarea", { id: id, rows: opciones.largo ? 3 : 2 });
+      control = h("textarea", { id: id, rows: opciones.filas || (opciones.largo ? 3 : 2) });
     } else if (opciones.tipo === "select") {
       control = h("select", { id: id },
         (opciones.opciones || []).map(function (o) {
@@ -245,7 +239,7 @@
     try {
       estado = await api("load");
       estado.cargado = !(estado.errores && estado.errores.length);
-      pendiente = { proyectos: false, material: false, textos: false };
+      pendiente = { proyectos: false, material: false, textos: false, sobre: false };
       sucio = false;
       pintarTodo();
       pintarBarra();
@@ -277,6 +271,7 @@
     pintarProyectos();
     pintarMaterial();
     pintarTextos();
+    pintarSobre();
     pintarAjustes();
     mostrarTab(tabActual);
   }
@@ -637,6 +632,7 @@
           base64: dataUrl
         });
         item.foto = respuesta.foto;
+        estado.cabeza = respuesta.cabeza || null;
         pintarMiniatura();
         var campoFoto = cuerpo.querySelector('input[placeholder="assets/img/material/A001.jpg"]');
         if (campoFoto) campoFoto.value = respuesta.foto;
@@ -700,7 +696,126 @@
     pintarMaterial(e.target.value);
   });
 
-  /* ---------------------------------- textos ---------------------------------- */
+  /* ---------------------------------- sobre mí ---------------------------------- */
+
+  function bloqueRetratoSobre() {
+    var datos = estado.sobre.datos;
+    var caja = h("div", { clase: "retrato-editor" });
+    var vista = h("div", { clase: "retrato-preview" });
+    var acciones = h("div", { clase: "retrato-acciones" });
+    var entrada = h("input", { type: "file", accept: "image/*", hidden: true });
+    var boton = h("button", {
+      clase: "boton boton-principal boton-mini", type: "button", texto: "Subir foto…",
+      onclick: function () { entrada.click(); }
+    });
+    var quitar = h("button", {
+      clase: "boton boton-mini boton-peligro", type: "button", texto: "Quitar foto",
+      onclick: function () {
+        delete datos.foto;
+        marcarSucio("sobre");
+        pintar();
+        toast("Foto quitada del borrador. Se aplicará al publicar.", "ok");
+      }
+    });
+    var progreso = h("span", { clase: "ayuda", texto: "" });
+
+    function pintar() {
+      vista.innerHTML = "";
+      if (datos.foto) vista.appendChild(h("img", { src: datos.foto, alt: "Retrato de Sobre mí" }));
+      else vista.appendChild(h("span", { texto: "Sin foto" }));
+      quitar.disabled = !datos.foto;
+    }
+
+    entrada.addEventListener("change", async function () {
+      var fichero = entrada.files && entrada.files[0];
+      if (!fichero) return;
+      boton.disabled = true;
+      progreso.textContent = "Comprimiendo y subiendo…";
+      try {
+        var dataUrl = await comprimirImagen(fichero, 1600);
+        var respuesta = await api("upload", {
+          action: "upload",
+          destino: "sobre",
+          base64: dataUrl
+        });
+        datos.foto = respuesta.foto;
+        estado.cabeza = respuesta.cabeza || null;
+        marcarSucio("sobre");
+        pintar();
+        progreso.textContent = "Foto subida (" + Math.round(dataUrl.length / 1365) + " KB).";
+        toast("Foto subida. Se aplicará al pulsar «Subir todos los cambios».", "ok");
+      } catch (error) {
+        progreso.textContent = "";
+        toast(error.message, "error");
+      } finally {
+        boton.disabled = false;
+        entrada.value = "";
+      }
+    });
+
+    pintar();
+    acciones.appendChild(boton);
+    acciones.appendChild(quitar);
+    acciones.appendChild(entrada);
+    acciones.appendChild(progreso);
+    caja.appendChild(vista);
+    caja.appendChild(h("div", { clase: "retrato-texto" }, [
+      h("strong", { texto: "Foto de Sobre mí" }),
+      h("p", {
+        clase: "ayuda",
+        texto: "Retrato que aparece junto a la presentación. Se recomienda una foto vertical. " +
+          "Al elegirla se sube al repositorio; la referencia se publica con el resto de cambios."
+      }),
+      acciones
+    ]));
+    return caja;
+  }
+
+  function pintarSobre() {
+    var lista = document.getElementById("lista-sobre");
+    lista.innerHTML = "";
+    if (!estado.sobre) estado.sobre = { datos: {} };
+    var datos = estado.sobre.datos;
+    if (!datos || typeof datos !== "object") datos = estado.sobre.datos = {};
+    if (!datos.contacto || typeof datos.contacto !== "object") datos.contacto = {};
+
+    lista.appendChild(bloqueRetratoSobre());
+    lista.appendChild(campo({
+      clave: "sobre_texto",
+      fichero: "sobre",
+      etiqueta: "Presentación",
+      ayuda: "El único texto de la página. Separa los párrafos con una línea en blanco.",
+      ancho: true,
+      tipo: "textarea",
+      filas: 14,
+      valor: datos.texto || "",
+      onInput: function (v) { datos.texto = v; }
+    }));
+
+    [
+      { clave: "email", etiqueta: "Email", tipo: "email", ayuda: "Se usa en el enlace de correo." },
+      { clave: "telefono", etiqueta: "Teléfono", ayuda: "El número tal y como quieres que se vea." },
+      { clave: "whatsapp", etiqueta: "WhatsApp (URL)", tipo: "url", ayuda: "Por ejemplo: https://wa.me/34640834663" },
+      { clave: "imdb", etiqueta: "IMDb (URL)", tipo: "url" },
+      { clave: "instagram", etiqueta: "Instagram (URL)", tipo: "url" }
+    ].forEach(function (def) {
+      lista.appendChild(campo({
+        clave: "sobre_contacto_" + def.clave,
+        fichero: "sobre",
+        etiqueta: def.etiqueta,
+        ayuda: def.ayuda,
+        ancho: true,
+        tipo: def.tipo || "text",
+        valor: datos.contacto[def.clave] || "",
+        onInput: function (v) { datos.contacto[def.clave] = v; }
+      }));
+    });
+
+    lista.appendChild(h("p", {
+      clase: "ayuda",
+      texto: "Los enlaces vacíos no se muestran en la página."
+    }));
+  }
 
   function pintarTextos() {
     var lista = document.getElementById("lista-textos");
@@ -758,6 +873,7 @@
     if (pendiente.proyectos) partes.push("proyectos");
     if (pendiente.material) partes.push("catálogo");
     if (pendiente.textos) partes.push("textos");
+    if (pendiente.sobre) partes.push("Sobre mí");
     if (!partes.length) {
       barra.hidden = true;
       sucio = false;
@@ -776,7 +892,7 @@
       );
       return;
     }
-    if (!pendiente.proyectos && !pendiente.material && !pendiente.textos) {
+    if (!pendiente.proyectos && !pendiente.material && !pendiente.textos && !pendiente.sobre) {
       toast("No hay cambios pendientes.", "error");
       return;
     }
@@ -811,6 +927,7 @@
     }
     if (pendiente.material) cambios.material = { datos: estado.material.datos };
     if (pendiente.textos) cambios.textos = { datos: estado.textos.datos };
+    if (pendiente.sobre) cambios.sobre = { datos: estado.sobre.datos };
 
     var boton = document.getElementById("btn-publicar");
     boton.disabled = true;
@@ -835,7 +952,7 @@
           "ok"
         );
       }
-      pendiente = { proyectos: false, material: false, textos: false };
+      pendiente = { proyectos: false, material: false, textos: false, sobre: false };
       sucio = false;
       pintarBarra();
       var fresco = await api("load");
@@ -850,7 +967,7 @@
       if (error.codigo === 409) {
         toast("Recargando el contenido del repositorio…", "error");
         await cargarTodo();
-        pendiente = { proyectos: false, material: false, textos: false };
+        pendiente = { proyectos: false, material: false, textos: false, sobre: false };
         pintarBarra();
       }
     } finally {
@@ -863,7 +980,7 @@
 
   document.getElementById("btn-descartar").addEventListener("click", async function () {
     if (!confirm("¿Descartar todos los cambios sin publicar?")) return;
-    pendiente = { proyectos: false, material: false, textos: false };
+    pendiente = { proyectos: false, material: false, textos: false, sobre: false };
     sucio = false;
     pintarBarra();
     await cargarTodo();

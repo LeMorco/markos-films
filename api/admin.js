@@ -35,7 +35,8 @@ const VENTANA_MS = 10 * 60 * 1000;
 const FICHEROS = {
   proyectos: { ruta: "assets/js/data.js", marca: "window.MARKOS", tipo: "js" },
   material: { ruta: "assets/js/rental.js", marca: "window.RENTAL", tipo: "js" },
-  textos: { ruta: "content/textos.json", marca: null, tipo: "json" }
+  textos: { ruta: "content/textos.json", marca: null, tipo: "json" },
+  sobre: { ruta: "content/sobre-mi.json", marca: null, tipo: "json" }
 };
 
 const COLA_CLIPS = "content/cola-clips.json";
@@ -47,13 +48,7 @@ const CLAVES_TEXTO = [
   "proyectos_intro",
   "alquiler_titulo",
   "alquiler_intro",
-  "contacto_titulo",
-  "sobre_titulo",
-  "sobre_bio",
-  "sobre_trayectoria",
-  "sobre_servicios",
-  "sobre_equipo",
-  "sobre_contacto"
+  "contacto_titulo"
 ];
 
 const intentos = new Map();
@@ -381,7 +376,7 @@ async function escribirBinario(ruta, buffer, mensaje) {
     const completo = pathMod.join(raiz, ruta);
     await fsp.mkdir(pathMod.dirname(completo), { recursive: true });
     await fsp.writeFile(completo, buffer);
-    return { commit: "local" };
+    return { commit: "local", cabeza: null };
   }
 
   const r = await fetch("https://api.github.com/repos/" + repo() + "/contents/" + ruta, {
@@ -403,7 +398,11 @@ async function escribirBinario(ruta, buffer, mensaje) {
     throw new Error("GitHub " + r.status + " al subir la imagen: " + detalle.slice(0, 300));
   }
   const datos = await r.json();
-  return { commit: datos.commit && datos.commit.sha ? datos.commit.sha.slice(0, 7) : null };
+  const cabeza = datos.commit && datos.commit.sha ? datos.commit.sha : null;
+  return {
+    commit: cabeza ? cabeza.slice(0, 7) : null,
+    cabeza
+  };
 }
 
 /* ------------------------------- validación ------------------------------- */
@@ -488,6 +487,31 @@ function normalizarTextos(datos) {
   return salida;
 }
 
+function normalizarSobre(datos) {
+  const contacto = (datos && datos.contacto) || {};
+  const salida = {
+    texto: texto(datos && datos.texto, 20000),
+    foto: texto(datos && datos.foto, 240),
+    contacto: {
+      email: texto(contacto.email, 160),
+      telefono: texto(contacto.telefono, 60),
+      whatsapp: texto(contacto.whatsapp, 240),
+      imdb: texto(contacto.imdb, 240),
+      instagram: texto(contacto.instagram, 240)
+    }
+  };
+  if (salida.foto && !/^assets\/img\/sobre\/[A-Za-z0-9._-]+$/.test(salida.foto)) {
+    throw new Error("Ruta de foto de Sobre mí no válida: " + salida.foto);
+  }
+  ["whatsapp", "imdb", "instagram"].forEach((clave) => {
+    const valor = salida.contacto[clave];
+    if (valor && !/^https?:\/\//.test(valor)) {
+      throw new Error("El enlace de " + clave + " debe empezar por http:// o https://");
+    }
+  });
+  return salida;
+}
+
 /* --------------------------------- lectura de los ficheros --------------------------------- */
 
 function evaluarJs(fuente) {
@@ -530,10 +554,11 @@ async function cargar() {
     }
   }
 
-  const [proyectos, material, textos] = await Promise.all([
+  const [proyectos, material, textos, sobre] = await Promise.all([
     leer(FICHEROS.proyectos.ruta),
     leer(FICHEROS.material.ruta),
-    leer(FICHEROS.textos.ruta)
+    leer(FICHEROS.textos.ruta),
+    leer(FICHEROS.sobre.ruta)
   ]);
 
   const markos = extraerJs(proyectos.texto, FICHEROS.proyectos.marca) || {};
@@ -544,6 +569,14 @@ async function cargar() {
       textosPlanos = JSON.parse(textos.texto);
     } catch (e) {
       textosPlanos = {};
+    }
+  }
+  let sobreDatos = {};
+  if (sobre.texto) {
+    try {
+      sobreDatos = JSON.parse(sobre.texto);
+    } catch (e) {
+      sobreDatos = {};
     }
   }
 
@@ -577,7 +610,8 @@ async function cargar() {
       datos: rental.material || [],
       sha: material.sha
     },
-    textos: { datos: textosPlanos, sha: textos.sha }
+    textos: { datos: textosPlanos, sha: textos.sha },
+    sobre: { datos: sobreDatos, sha: sobre.sha }
   };
 }
 
@@ -634,6 +668,23 @@ async function guardar(fichero, datos, baseSha) {
     }
     const nuevo = Object.assign({}, rental, { material: nuevos });
     return escribir(fichero, actual, nuevo, "Panel: catálogo de alquiler");
+  }
+
+  if (fichero === "sobre") {
+    const actual = await leerFichero(FICHEROS.sobre.ruta);
+    if (baseSha && actual.sha && baseSha !== actual.sha) {
+      throw new Error("CONFLICTO: el Sobre mí ha cambiado desde que abriste el panel. Recarga.");
+    }
+    const limpios = normalizarSobre(datos.sobre);
+    const contenido = JSON.stringify(limpios, null, 2) + "\n";
+    if (contenido === actual.texto) return { sinCambios: true };
+    const resultado = await escribirFichero(
+      FICHEROS.sobre.ruta,
+      contenido,
+      actual.sha,
+      "Panel: Sobre mí"
+    );
+    return { ok: true, commit: resultado.commit };
   }
 
   const actual = await leerFichero(FICHEROS.textos.ruta);
@@ -765,9 +816,13 @@ async function importar(datos) {
 }
 
 async function subirImagen(datos) {
-  const codigo = texto(datos.codigo, 12)
-    .toUpperCase()
-    .replace(/[^A-Z0-9-]/g, "");
+  const destino = datos.destino === "sobre" ? "sobre" : "material";
+  const codigo =
+    destino === "sobre"
+      ? "retrato"
+      : texto(datos.codigo, 12)
+          .toUpperCase()
+          .replace(/[^A-Z0-9-]/g, "");
   if (!codigo) throw new Error("Falta el código de la referencia");
 
   const coincidencia = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(
@@ -786,13 +841,15 @@ async function subirImagen(datos) {
     new Date().toISOString().slice(0, 10).replace(/-/g, "") +
     "-" +
     crypto.randomBytes(2).toString("hex");
-  const ruta = "assets/img/material/" + codigo + "-" + sello + "." + extension;
+  const carpeta = destino === "sobre" ? "assets/img/sobre/" : "assets/img/material/";
+  const ruta = carpeta + codigo + "-" + sello + "." + extension;
   const resultado = await escribirBinario(
     ruta,
     buffer,
-    "Panel: foto de " + codigo + " (" + Math.round(buffer.length / 1024) + " KB)"
+    (destino === "sobre" ? "Panel: foto de Sobre mí" : "Panel: foto de " + codigo) +
+      " (" + Math.round(buffer.length / 1024) + " KB)"
   );
-  return { ok: true, foto: ruta, commit: resultado.commit };
+  return { ok: true, foto: ruta, commit: resultado.commit, cabeza: resultado.cabeza };
 }
 
 async function encolarClip(datos) {
@@ -956,6 +1013,17 @@ async function publicar(datos, baseSha) {
       diff.nuevos.forEach((m) => detalle.push("+ material: " + m.codigo + " " + m.nombre));
       diff.editados.forEach((m) => detalle.push("~ material: " + m.codigo + " " + m.nombre));
       diff.borrados.forEach((m) => detalle.push("- material: " + m.codigo + " " + m.nombre));
+    }
+  }
+
+  if (cambios.sobre) {
+    const actual = await leerFichero(FICHEROS.sobre.ruta);
+    const nuevos = normalizarSobre(cambios.sobre.datos);
+    const contenido = JSON.stringify(nuevos, null, 2) + "\n";
+    if (contenido !== actual.texto) {
+      ficheros.push({ ruta: FICHEROS.sobre.ruta, contenido });
+      titulos.push("Sobre mí");
+      detalle.push("~ Sobre mí: foto, texto o contacto");
     }
   }
 

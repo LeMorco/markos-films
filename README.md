@@ -65,14 +65,15 @@ Eso deja `assets/img/proyectos/lo-que-queda-todavia.jpg`, `assets/video/preview/
 
 ## Panel de edición (`/admin`)
 
-Página privada para cambiar el contenido sin tocar código: proyectos, catálogo de alquiler, textos fijos de las páginas y datos de contacto.
+Página privada para cambiar el contenido sin tocar código: proyectos, catálogo de alquiler, textos fijos de las páginas, la página «Sobre mí» y datos de contacto.
 
 Los cambios **se acumulan como borrador**: editas lo que quieras (la barra de abajo indica qué hay sin publicar) y al pulsar **Subir todos los cambios** se hace **un único commit** con todos los ficheros afectados (API de datos de Git: blobs + tree + commit + ref, un solo evento para Vercel), con un mensaje generado automáticamente del tipo «Panel: 1 proyecto nuevo, 2 editados · catálogo: 3 referencias actualizadas · 2 textos», y el detalle de cada cambio en el cuerpo del commit. «Descartar» vuelve a lo que hay en el repositorio.
 
-- `admin.html` — interfaz (login, pestañas de Proyectos, Material, Textos y Ajustes).
+- `admin.html` — interfaz (login, pestañas de Proyectos, Material, Textos, Sobre mí y Ajustes).
 - `assets/js/admin.js` — formularios y llamadas al panel.
 - `api/admin.js` — función serverless: sesión firmada por cookie, validación y commit vía API de GitHub. El token y la contraseña viven en el servidor, nunca en el navegador.
 - `content/textos.json` — literales editables; `assets/js/textos.js` los aplica sobre los elementos con `data-txt` al cargar cada página.
+- `content/sobre-mi.json` — texto, foto y contacto de «Sobre mí»; `assets/js/sobre-mi.js` los aplica al cargar la página.
 
 ### Configuración (una sola vez, en Vercel)
 

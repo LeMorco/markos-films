@@ -156,6 +156,24 @@ body.admin{background:var(--bg);}
 .subida{display:flex;align-items:center;gap:0.8rem;flex-wrap:wrap;}
 .subida .ayuda{margin:0;}
 
+/* --------------------------- retrato Sobre mí --------------------------- */
+.retrato-editor{
+  display:flex;gap:1rem;align-items:flex-start;flex-wrap:wrap;
+  border:0.5px solid var(--faint);padding:0.9rem;background:rgba(114,155,147,0.04);
+}
+.retrato-preview{
+  width:110px;aspect-ratio:3/4;flex:0 0 auto;background:var(--surface);
+  border:0.5px solid var(--faint-2);overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
+}
+.retrato-preview img{width:100%;height:100%;object-fit:cover;}
+.retrato-preview span{font-size:9px;letter-spacing:0.1em;color:var(--muted);}
+.retrato-texto{flex:1;min-width:220px;display:flex;flex-direction:column;gap:0.45rem;}
+.retrato-texto strong{font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:var(--muted);}
+.retrato-texto .ayuda{margin:0;}
+.retrato-acciones{display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;margin-top:0.2rem;}
+.retrato-acciones .ayuda{margin:0;}
+
 /* --------------------------- importar por URL --------------------------- */
 .importar{
   border:0.5px solid var(--accent);background:rgba(114,155,147,0.06);
