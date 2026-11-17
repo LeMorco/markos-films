@@ -29,7 +29,7 @@ window.MARKOS = {
       "link": "https://www.youtube.com/watch?v=bPbJyR84kCk",
       "director": "Mikel Arraiz",
       "productora": "Dromedario Récords",
-      "fotografia": "",
+      "fotografia": "Beñat Goia",
       "year": "2026",
       "rol": "Gaffer",
       "descripcion": "",
