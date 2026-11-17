@@ -44,10 +44,10 @@ if (!Number.isFinite(maxDeployments) || maxDeployments < 1) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function api(path, { method = 'GET', query } = {}) {
+async function api(path, { method = 'GET', query, useTeam = true } = {}) {
   const url = new URL(API + path);
   const params = { ...query };
-  if (teamId) params.teamId = teamId;
+  if (teamId && useTeam) params.teamId = teamId;
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') {
       url.searchParams.set(key, String(value));
@@ -106,15 +106,57 @@ async function resolveProject() {
   try {
     return await api(`/v9/projects/${encodeURIComponent(projectNameOrId)}`);
   } catch (error) {
-    if (error.status === 404) {
-      throw new Error(
-        `No encuentro el proyecto "${projectNameOrId}"` +
-          (teamId ? ' en el equipo indicado' : '') +
-          '. Revisa VERCEL_PROJECT, VERCEL_TEAM_SLUG y que el token tenga acceso.',
-      );
-    }
-    throw error;
+    if (error.status !== 404) throw error;
   }
+
+  /* A veces el proyecto se ha renombrado o está en la cuenta personal y no
+     en el equipo. Se busca por nombre normalizado en ambos ámbitos. */
+  const normalizar = (valor) => String(valor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const buscado = normalizar(projectNameOrId);
+  const ambitos = [];
+  if (teamId) ambitos.push({ useTeam: true, etiqueta: 'equipo' });
+  ambitos.push({ useTeam: false, etiqueta: 'cuenta personal' });
+  const disponibles = [];
+
+  for (const ambito of ambitos) {
+    let proyectos = [];
+    try {
+      const datos = await api('/v9/projects', {
+        query: { limit: 100 },
+        useTeam: ambito.useTeam,
+      });
+      proyectos = Array.isArray(datos?.projects) ? datos.projects : [];
+    } catch (error) {
+      console.log(`  · No se pudieron listar los proyectos de la ${ambito.etiqueta}: ${error.message}`);
+      continue;
+    }
+
+    for (const proyecto of proyectos) {
+      disponibles.push(`${proyecto.name} (${ambito.etiqueta})`);
+    }
+
+    const encontrado = proyectos.find((proyecto) =>
+      proyecto.id === projectNameOrId ||
+      proyecto.name === projectNameOrId ||
+      normalizar(proyecto.name) === buscado
+    );
+
+    if (encontrado) {
+      if (!ambito.useTeam) teamId = null;
+      console.log(
+        `  · Proyecto encontrado como "${encontrado.name}" en la ${ambito.etiqueta}.` +
+        (encontrado.name !== projectNameOrId ? ' Se usará ese nombre.' : '')
+      );
+      return encontrado;
+    }
+  }
+
+  const lista = Array.from(new Set(disponibles)).join(', ') || '(no se pudo listar ninguno)';
+  throw new Error(
+    `No encuentro el proyecto "${projectNameOrId}". ` +
+      `Proyectos disponibles para este token: ${lista}. ` +
+      'Revisa VERCEL_PROJECT, VERCEL_TEAM_SLUG/VERCEL_TEAM_ID y que el token tenga acceso.'
+  );
 }
 
 function createdMs(deployment) {
