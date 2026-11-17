@@ -12,7 +12,7 @@
    ============================================================ */
 window.MARKOS = {
   "nombre": "Marcos Donate",
-  "rol": "Técnico de iluminación",
+  "rol": "Eléctrico",
   "email": "markosfilms1@gmail.com",
   "instagram": "https://www.instagram.com/marcoss_donate/",
   "base": "Navarra, España",
