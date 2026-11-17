@@ -444,6 +444,17 @@ async function cargar() {
       return { texto: "", sha: null, existe: false };
     }
   };
+  const colaClip = await leer(COLA_CLIPS);
+  let enCola = 0;
+  if (colaClip.texto) {
+    try {
+      const parseada = JSON.parse(colaClip.texto);
+      enCola = Array.isArray(parseada) ? parseada.length : 0;
+    } catch (error) {
+      enCola = 0;
+    }
+  }
+
   const [proyectos, material, textos] = await Promise.all([
     leer(FICHEROS.proyectos.ruta),
     leer(FICHEROS.material.ruta),
@@ -463,6 +474,7 @@ async function cargar() {
 
   return {
     errores,
+    cola: enCola,
     proyectos: {
       datos: markos.proyectos || [],
       general: {

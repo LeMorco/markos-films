@@ -295,6 +295,21 @@
     estado.proyectos.datos.forEach(function (proyecto, indice) {
       lista.appendChild(fichaProyecto(proyecto, indice));
     });
+    var avisoCola = document.getElementById("aviso-cola");
+    if (avisoCola) avisoCola.remove();
+    if ((estado.cola || 0) > 0) {
+      lista.insertBefore(
+        h("p", {
+          clase: "ayuda aviso-cola",
+          id: "aviso-cola",
+          texto:
+            "Hay " + estado.cola + " clip(s) en cola. Los descarga tu ordenador (YouTube bloquea " +
+            "a Vercel y a GitHub): haz doble clic en actualizar-clips.bat en la carpeta del proyecto " +
+            "y se generan y publican solos."
+        }),
+        lista.firstChild
+      );
+    }
     if (!estado.proyectos.datos.length) {
       lista.appendChild(h("p", {
         clase: "ayuda",

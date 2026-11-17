@@ -32,6 +32,25 @@ Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el
 - **`assets/img/material/`** — foto de cada pieza, nombrada con su código (`A001.jpg`…).
 - **`api/solicitud.js`** — función serverless que envía las solicitudes por Resend.
 
+## Añadir un proyecto con solo la URL
+
+En `/admin` → **Proyectos** hay un campo para pegar la URL de YouTube y pulsar **Añadir**:
+
+- Saca el título y el artista del propio vídeo, genera el slug y guarda la ficha con el id, el enlace y la miniatura (la miniatura no se descarga: la web usa la de YouTube a partir del id, así que aparece sola en el grid y en la ficha).
+- Añade la ficha **al final** de la lista, sin tocar las que ya hay, y puedes completar tipo, año y descripción después.
+
+El **clip de 7 s** no se puede generar desde el servidor: YouTube bloquea las IPs de datacenter (probado en Vercel y en GitHub Actions con «Sign in to confirm you're not a bot»). Por eso el panel lo deja *en cola* en `content/cola-clips.json` y hay dos formas de generarlo desde tu red:
+
+```
+# doble clic en la raíz del repo
+actualizar-clips.bat
+
+# o por terminal
+python tools/procesar_cola.py
+```
+
+El script descarga cada vídeo hasta 1080p, corta el clip, lo guarda en `assets/video/preview/<slug>.mp4`, vacía la cola y hace commit + push. Vercel publica solo.
+
 ## Panel de edición (`/admin`)
 
 Página privada para cambiar el contenido sin tocar código: proyectos, catálogo de alquiler, textos fijos de las páginas y datos de contacto. Cada guardado es un commit en GitHub, así que Vercel republica la web en ~60 s y todo queda en el historial (se puede revertir desde GitHub).

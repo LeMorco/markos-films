@@ -168,3 +168,8 @@ body.admin{background:var(--bg);}
 .check input{width:15px;height:15px;accent-color:var(--accent);cursor:pointer;}
 .clip-estado{font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--muted);}
 .clip-estado.hecho{color:var(--accent-soft);}
+
+.aviso-cola{
+  border-left:2px solid var(--sand);padding:0.7rem 0.9rem;
+  background:rgba(145,128,110,0.09);color:var(--text-dim);
+}
