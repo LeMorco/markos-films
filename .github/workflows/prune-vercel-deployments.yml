@@ -59,8 +59,9 @@ jobs:
         if: steps.token.outputs.ok == 'true'
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT: markos-films
-          VERCEL_TEAM_SLUG: marcos-arranzs-projects
+          # Se puede cambiar desde Settings → Variables sin tocar el workflow.
+          VERCEL_PROJECT: ${{ vars.VERCEL_PROJECT || 'marcosdonate' }}
+          VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG || 'marcos-arranzs-projects' }}
           MAX_DEPLOYMENTS: ${{ inputs.max_deployments || '15' }}
           DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
         run: node scripts/prune-vercel-deployments.mjs
