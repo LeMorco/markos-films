@@ -35,7 +35,7 @@ window.MARKOS = {
       "descripcion": "",
       "nota": "",
       "preview": 36,
-      "previewFin": 43
+      "previewFin": 42
     },
     {
       "slug": "en-estado-de-coma",
