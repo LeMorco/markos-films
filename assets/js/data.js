@@ -177,14 +177,14 @@ window.MARKOS = {
     {
       "slug": "oparitu-mundua-aldatzeko-hazi-bat",
       "titulo": "Oparitu mundua aldatzeko hazi bat",
-      "tipo": "",
+      "tipo": "Publicidad",
       "artista": "Txalaparta",
       "youtube": "Uwi6OgivB5U",
       "link": "https://www.youtube.com/watch?v=Uwi6OgivB5U",
-      "director": "",
-      "productora": "",
-      "year": "",
-      "rol": "Técnico de iluminación (gaffer)",
+      "director": "Ekaitz Bertiz",
+      "productora": "Goroabe",
+      "year": "2025",
+      "rol": "Gaffer",
       "descripcion": "",
       "nota": ""
     }
