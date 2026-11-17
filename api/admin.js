@@ -300,6 +300,75 @@ async function escribirFichero(ruta, contenido, sha, mensaje) {
   return { commit: datos.commit && datos.commit.sha ? datos.commit.sha.slice(0, 7) : null };
 }
 
+async function ghJson(ruta, opciones) {
+  const r = await fetch("https://api.github.com/repos/" + repo() + ruta, Object.assign({
+    headers: Object.assign({
+      Authorization: "Bearer " + token(),
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json",
+      "User-Agent": "markos-admin"
+    }, (opciones && opciones.headers) || {})
+  }, opciones || {}));
+  if (!r.ok) {
+    const detalle = await r.text();
+    throw new Error("GitHub " + r.status + " en " + ruta + ": " + detalle.slice(0, 240));
+  }
+  return r.json();
+}
+
+/* un solo commit con varios ficheros (API de datos de Git) */
+async function commitMultiple(ficheros, mensaje, cuerpo, baseSha) {
+  const raiz = env("ADMIN_LOCAL_ROOT");
+  if (raiz) {
+    for (const f of ficheros) {
+      const completo = pathMod.join(raiz, f.ruta);
+      await fsp.mkdir(pathMod.dirname(completo), { recursive: true });
+      await fsp.writeFile(completo, f.contenido, "utf8");
+    }
+    return { commit: "local" };
+  }
+
+  const ref = await ghJson("/git/ref/heads/" + rama());
+  const actual = ref.object.sha;
+  if (baseSha && actual !== baseSha) {
+    throw new Error(
+      "CONFLICTO: el repositorio ha cambiado desde que abriste el panel. " +
+      "Recarga y vuelve a aplicar los cambios."
+    );
+  }
+  const base = await ghJson("/git/commits/" + actual);
+
+  const blobs = [];
+  for (const f of ficheros) {
+    const blob = await ghJson("/git/blobs", {
+      method: "POST",
+      body: JSON.stringify({ content: f.contenido, encoding: "utf-8" })
+    });
+    blobs.push({ path: f.ruta, mode: "100644", type: "blob", sha: blob.sha });
+  }
+
+  const arbol = await ghJson("/git/trees", {
+    method: "POST",
+    body: JSON.stringify({ base_tree: base.tree.sha, tree: blobs })
+  });
+
+  const commit = await ghJson("/git/commits", {
+    method: "POST",
+    body: JSON.stringify({
+      message: cuerpo ? mensaje + "\n\n" + cuerpo : mensaje,
+      tree: arbol.sha,
+      parents: [actual]
+    })
+  });
+
+  await ghJson("/git/refs/heads/" + rama(), {
+    method: "PATCH",
+    body: JSON.stringify({ sha: commit.sha, force: false })
+  });
+
+  return { commit: commit.sha.slice(0, 7) };
+}
+
 async function escribirBinario(ruta, buffer, mensaje) {
   const raiz = env("ADMIN_LOCAL_ROOT");
   if (raiz) {
@@ -472,8 +541,19 @@ async function cargar() {
     }
   }
 
+  let cabeza = null;
+  if (!env("ADMIN_LOCAL_ROOT")) {
+    try {
+      const ref = await ghJson("/git/ref/heads/" + rama());
+      cabeza = ref.object.sha;
+    } catch (error) {
+      cabeza = null;
+    }
+  }
+
   return {
     errores,
+    cabeza,
     cola: enCola,
     proyectos: {
       datos: markos.proyectos || [],
@@ -734,6 +814,168 @@ async function encolarClip(datos) {
   return { ok: true, enCola: cola.length, commit: resultado.commit };
 }
 
+/* ------------------------- publicación conjunta ------------------------- */
+
+function canonico(obj) {
+  if (!obj || typeof obj !== "object") return JSON.stringify(obj);
+  return JSON.stringify(
+    Object.keys(obj)
+      .sort()
+      .reduce((acc, clave) => {
+        acc[clave] = obj[clave];
+        return acc;
+      }, {})
+  );
+}
+
+function diferir(viejos, nuevos, clave) {
+  const indexar = (lista) => {
+    const mapa = new Map();
+    (lista || []).forEach((item) => {
+      if (item && item[clave] != null) mapa.set(item[clave], item);
+    });
+    return mapa;
+  };
+  const antes = indexar(viejos);
+  const despues = indexar(nuevos);
+  const nuevosItems = [];
+  const editados = [];
+  const borrados = [];
+
+  despues.forEach((item, id) => {
+    if (!antes.has(id)) nuevosItems.push(item);
+    else if (canonico(antes.get(id)) !== canonico(item)) editados.push(item);
+  });
+  antes.forEach((item, id) => {
+    if (!despues.has(id)) borrados.push(item);
+  });
+
+  return { nuevos: nuevosItems, editados, borrados };
+}
+
+function trozoProyectos(diff, generalCambiado) {
+  const partes = [];
+  if (diff.nuevos.length) {
+    partes.push(diff.nuevos.length + (diff.nuevos.length === 1 ? " proyecto nuevo" : " proyectos nuevos"));
+  }
+  if (diff.editados.length) {
+    partes.push(diff.editados.length + (diff.editados.length === 1 ? " proyecto editado" : " proyectos editados"));
+  }
+  if (diff.borrados.length) {
+    partes.push(diff.borrados.length + (diff.borrados.length === 1 ? " proyecto borrado" : " proyectos borrados"));
+  }
+  if (!partes.length && generalCambiado) partes.push("datos de contacto");
+  return partes.join(", ");
+}
+
+async function publicar(datos, baseSha) {
+  const cambios = datos.cambios || {};
+  const confirmar = datos.confirmar === true;
+  const ficheros = [];
+  const titulos = [];
+  const detalle = [];
+
+  if (cambios.proyectos) {
+    const actual = await leerFichero(FICHEROS.proyectos.ruta);
+    const markos = extraerJs(actual.texto, FICHEROS.proyectos.marca) || {};
+    const viejos = Array.isArray(markos.proyectos) ? markos.proyectos : [];
+    const nuevos = normalizarProyectos(cambios.proyectos.datos);
+
+    if (viejos.length > 0 && nuevos.length < viejos.length && !confirmar) {
+      throw new Error(
+        "PROTECCION: se van a guardar " + nuevos.length + " proyectos y en el repositorio hay " +
+        viejos.length + ". No se ha guardado nada. Recarga el panel; si de verdad quieres " +
+        "borrar fichas, vuelve a publicar y confirma el aviso."
+      );
+    }
+
+    const diff = diferir(viejos, nuevos, "slug");
+    const nuevoObjeto = Object.assign({}, markos);
+    let generalCambiado = false;
+    if (cambios.proyectos.general) {
+      ["nombre", "rol", "email", "instagram", "base"].forEach((clave) => {
+        if (!Object.prototype.hasOwnProperty.call(cambios.proyectos.general, clave)) return;
+        const valor = texto(cambios.proyectos.general[clave], clave === "instagram" ? 240 : 160);
+        if (clave === "nombre" && !valor) return;
+        if (nuevoObjeto[clave] !== valor) generalCambiado = true;
+        nuevoObjeto[clave] = valor;
+      });
+    }
+    nuevoObjeto.proyectos = nuevos;
+
+    const contenido = serializarJs(actual.texto, FICHEROS.proyectos.marca, nuevoObjeto);
+    if (contenido !== actual.texto) {
+      ficheros.push({ ruta: FICHEROS.proyectos.ruta, contenido });
+      titulos.push(trozoProyectos(diff, generalCambiado));
+      diff.nuevos.forEach((p) => detalle.push("+ proyecto: " + p.titulo + " (" + p.slug + ")"));
+      diff.editados.forEach((p) => detalle.push("~ proyecto: " + p.titulo + " (" + p.slug + ")"));
+      diff.borrados.forEach((p) => detalle.push("- proyecto: " + (p.titulo || p.slug)));
+      if (generalCambiado) detalle.push("~ datos generales");
+    }
+  }
+
+  if (cambios.material) {
+    const actual = await leerFichero(FICHEROS.material.ruta);
+    const rental = extraerJs(actual.texto, FICHEROS.material.marca) || {};
+    const categorias = Array.isArray(rental.categorias) ? rental.categorias : [];
+    const viejos = Array.isArray(rental.material) ? rental.material : [];
+    const nuevos = normalizarMaterial(cambios.material.datos, categorias);
+
+    if (viejos.length > 0 && nuevos.length < viejos.length && !confirmar) {
+      throw new Error(
+        "PROTECCION: se van a guardar " + nuevos.length + " referencias y en el repositorio hay " +
+        viejos.length + ". No se ha guardado nada. Recarga el panel."
+      );
+    }
+
+    const diff = diferir(viejos, nuevos, "id");
+    const nuevoObjeto = Object.assign({}, rental, { material: nuevos });
+    const contenido = serializarJs(actual.texto, FICHEROS.material.marca, nuevoObjeto);
+    if (contenido !== actual.texto) {
+      ficheros.push({ ruta: FICHEROS.material.ruta, contenido });
+      const partes = [];
+      const plural = (n, singular, varios) => n + " " + (n === 1 ? singular : varios);
+      if (diff.nuevos.length) partes.push(plural(diff.nuevos.length, "referencia nueva", "referencias nuevas"));
+      if (diff.editados.length) partes.push(plural(diff.editados.length, "referencia actualizada", "referencias actualizadas"));
+      if (diff.borrados.length) partes.push(plural(diff.borrados.length, "referencia borrada", "referencias borradas"));
+      titulos.push("catálogo: " + partes.join(", "));
+      diff.nuevos.forEach((m) => detalle.push("+ material: " + m.codigo + " " + m.nombre));
+      diff.editados.forEach((m) => detalle.push("~ material: " + m.codigo + " " + m.nombre));
+      diff.borrados.forEach((m) => detalle.push("- material: " + m.codigo + " " + m.nombre));
+    }
+  }
+
+  if (cambios.textos) {
+    const actual = await leerFichero(FICHEROS.textos.ruta);
+    let viejos = {};
+    if (actual.texto) {
+      try {
+        viejos = JSON.parse(actual.texto);
+      } catch (error) {
+        viejos = {};
+      }
+    }
+    const nuevos = normalizarTextos(cambios.textos.datos);
+    const contenido = JSON.stringify(nuevos, null, 2) + "\n";
+    if (contenido !== actual.texto) {
+      ficheros.push({ ruta: FICHEROS.textos.ruta, contenido });
+      const claves = Object.keys(nuevos).filter((k) => viejos[k] !== nuevos[k]);
+      titulos.push(claves.length + (claves.length === 1 ? " texto" : " textos"));
+      claves.forEach((k) => detalle.push("~ texto: " + k));
+    }
+  }
+
+  const conTitulo = titulos.filter(Boolean);
+  if (!ficheros.length) {
+    return { sinCambios: true, mensaje: "No hay cambios que publicar" };
+  }
+
+  const mensaje = "Panel: " + (conTitulo.join(" · ") || "cambios de contenido");
+  const cuerpo = detalle.length ? detalle.join("\n") : "";
+  const resultado = await commitMultiple(ficheros, mensaje, cuerpo, baseSha);
+  return { ok: true, commit: resultado.commit, mensaje, ficheros: ficheros.length, detalle };
+}
+
 /* ---------------------------------- handler ---------------------------------- */
 
 module.exports = async function handler(req, res) {
@@ -841,6 +1083,11 @@ module.exports = async function handler(req, res) {
     if (accion === "upload") {
       if (req.method !== "POST") return json(res, 405, { error: "Usa POST" });
       return json(res, 200, await subirImagen(enviado));
+    }
+
+    if (accion === "publicar") {
+      if (req.method !== "POST") return json(res, 405, { error: "Usa POST" });
+      return json(res, 200, await publicar(enviado, enviado.baseSha));
     }
 
     if (accion === "save") {

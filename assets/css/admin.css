@@ -173,3 +173,15 @@ body.admin{background:var(--bg);}
   border-left:2px solid var(--sand);padding:0.7rem 0.9rem;
   background:rgba(145,128,110,0.09);color:var(--text-dim);
 }
+
+/* ------------------------- publicar todos los cambios ------------------------- */
+.barra-publicar{
+  position:fixed;left:0;right:0;bottom:0;z-index:150;
+  display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;
+  padding:0.9rem 1.5rem;background:rgba(8,17,14,0.97);backdrop-filter:blur(14px);
+  border-top:0.5px solid var(--accent);
+  box-shadow:0 -14px 40px rgba(0,0,0,0.5);
+}
+.pendientes{font-size:11px;letter-spacing:0.16em;text-transform:uppercase;color:var(--sand);}
+.barra-publicar-acciones{display:flex;gap:0.6rem;align-items:center;}
+body.admin:has(.barra-publicar:not([hidden])) .contenido{padding-bottom:7rem;}

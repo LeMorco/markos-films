@@ -10,6 +10,7 @@
   var estado = null;
   var tabActual = "proyectos";
   var sucio = false;
+  var pendiente = { proyectos: false, material: false, textos: false };
 
   var TEXTOS = [
     { clave: "hero_kicker", etiqueta: "Portada · antetítulo", ayuda: "La línea pequeña encima del titular del inicio." },
@@ -75,7 +76,7 @@
     }
     if (opciones.valor != null) control.value = opciones.valor;
     control.addEventListener("input", function () {
-      marcarSucio();
+      marcarSucio(opciones.fichero);
       if (opciones.onInput) opciones.onInput(control.value, control);
     });
     var caja = h("div", { clase: "campo" + (opciones.ancho ? " campo-ancho" : "") }, [
@@ -106,13 +107,13 @@
     toastTimer = setTimeout(function () { el.className = "toast"; }, tipo === "error" ? 9000 : 4500);
   }
 
-  function marcarSucio() {
+  function marcarSucio(fichero) {
+    if (fichero) pendiente[fichero] = true;
     sucio = true;
-    aviso("Cambios sin guardar");
+    pintarBarra();
   }
 
   function marcarLimpio(texto, tipo) {
-    sucio = false;
     aviso(texto || "", tipo);
   }
 
@@ -238,7 +239,10 @@
     try {
       estado = await api("load");
       estado.cargado = !(estado.errores && estado.errores.length);
+      pendiente = { proyectos: false, material: false, textos: false };
+      sucio = false;
       pintarTodo();
+      pintarBarra();
       if (!estado.cargado) {
         marcarLimpio("No se pudo leer el contenido", "error");
         toast(
@@ -333,6 +337,7 @@
     CAMPOS_PROYECTO.forEach(function (def) {
       var c = campo({
         clave: def.clave,
+        fichero: "proyectos",
         etiqueta: def.etiqueta,
         ayuda: def.ayuda,
         ancho: def.ancho,
@@ -351,6 +356,7 @@
 
     cuerpo.appendChild(campo({
       clave: "slug_" + indice,
+      fichero: "proyectos",
       etiqueta: "Dirección de la ficha (slug)",
       ayuda: "Aparece en proyecto.html?p=… No lo cambies si ya has compartido el enlace.",
       valor: proyecto.slug || "",
@@ -394,7 +400,7 @@
           if (!confirm("¿Eliminar «" + (proyecto.titulo || proyecto.slug) + "» del portfolio?")) return;
           estado.proyectos.datos.splice(indice, 1);
           pintarProyectos();
-          marcarSucio();
+          marcarSucio("proyectos");
         }
       }),
       h("span", { clase: "ficha-meta", texto: "Recuerda guardar para publicar" })
@@ -476,7 +482,7 @@
       var input = ultima.querySelector("input");
       if (input) input.focus();
     }
-    marcarSucio();
+    marcarSucio("proyectos");
   });
 
   /* --------------------------------- material --------------------------------- */
@@ -549,7 +555,7 @@
 
     var cuerpo = h("div", { clase: "ficha-cuerpo material-campos" });
     cuerpo.appendChild(campo({
-      clave: "codigo_" + indice, etiqueta: "Código", valor: item.codigo || "",
+      clave: "codigo_" + indice, fichero: "material", etiqueta: "Código", valor: item.codigo || "",
       onInput: function (v) {
         item.codigo = v;
         item.id = v.toUpperCase();
@@ -559,14 +565,14 @@
       }
     }));
     cuerpo.appendChild(campo({
-      clave: "nombre_" + indice, etiqueta: "Nombre", valor: item.nombre || "",
+      clave: "nombre_" + indice, fichero: "material", etiqueta: "Nombre", valor: item.nombre || "",
       onInput: function (v) {
         item.nombre = v;
         cabecera.querySelector(".ficha-titulo").textContent = v || "(sin nombre)";
       }
     }));
     cuerpo.appendChild(campo({
-      clave: "categoria_" + indice, etiqueta: "Categoría", tipo: "select",
+      clave: "categoria_" + indice, fichero: "material", etiqueta: "Categoría", tipo: "select",
       valor: item.categoria,
       opciones: estado.material.categorias.map(function (c) {
         return { valor: c.id, etiqueta: c.nombre };
@@ -574,7 +580,7 @@
       onInput: function (v) { item.categoria = v; }
     }));
     cuerpo.appendChild(campo({
-      clave: "unidades_" + indice, etiqueta: "Unidades", tipo: "number",
+      clave: "unidades_" + indice, fichero: "material", etiqueta: "Unidades", tipo: "number",
       ayuda: "Vacío = sin límite",
       valor: item.unidades == null ? "" : item.unidades,
       onInput: function (v) {
@@ -584,12 +590,12 @@
       }
     }));
     cuerpo.appendChild(campo({
-      clave: "notas_" + indice, etiqueta: "Notas / especificaciones", tipo: "textarea", ancho: true,
+      clave: "notas_" + indice, fichero: "material", etiqueta: "Notas / especificaciones", tipo: "textarea", ancho: true,
       valor: item.notas || "",
       onInput: function (v) { item.notas = v; }
     }));
     cuerpo.appendChild(campo({
-      clave: "foto_" + indice, etiqueta: "Foto", ancho: true,
+      clave: "foto_" + indice, fichero: "material", etiqueta: "Foto", ancho: true,
       marcador: "assets/img/material/A001.jpg",
       valor: item.foto || "",
       ayuda: "Puedes subir una foto nueva o escribir la ruta de una que ya exista.",
@@ -621,9 +627,9 @@
         pintarMiniatura();
         var campoFoto = cuerpo.querySelector('input[placeholder="assets/img/material/A001.jpg"]');
         if (campoFoto) campoFoto.value = respuesta.foto;
-        progresoFoto.textContent = "Subida (" + Math.round(dataUrl.length / 1365) + " KB). Guarda el catálogo para aplicarla.";
-        marcarSucio();
-        toast("Foto subida. Pulsa «Guardar catálogo» para publicarla.", "ok");
+        progresoFoto.textContent = "Foto subida (" + Math.round(dataUrl.length / 1365) + " KB).";
+        marcarSucio("material");
+        toast("Foto subida. Se aplicará al pulsar «Subir todos los cambios».", "ok");
       } catch (error) {
         progresoFoto.textContent = "";
         toast(error.message, "error");
@@ -641,7 +647,7 @@
           if (!confirm("¿Quitar «" + (item.nombre || item.codigo) + "» del catálogo?")) return;
           estado.material.datos.splice(indice, 1);
           pintarMaterial(document.getElementById("filtro-material").value);
-          marcarSucio();
+          marcarSucio("material");
         }
       })
     ]));
@@ -674,7 +680,7 @@
       primera.querySelectorAll("input")[1].focus();
       primera.scrollIntoView({ block: "center" });
     }
-    marcarSucio();
+    marcarSucio("material");
   });
 
   document.getElementById("filtro-material").addEventListener("input", function (e) {
@@ -689,6 +695,7 @@
     TEXTOS.forEach(function (def) {
       lista.appendChild(campo({
         clave: "txt_" + def.clave,
+        fichero: "textos",
         etiqueta: def.etiqueta,
         ayuda: def.ayuda,
         ancho: true,
@@ -719,6 +726,7 @@
     ].forEach(function (def) {
       lista.appendChild(campo({
         clave: "gen_" + def.clave,
+        fichero: "proyectos",
         etiqueta: def.etiqueta,
         ancho: def.ancho,
         valor: general[def.clave] || "",
@@ -727,108 +735,133 @@
     });
   }
 
-  /* --------------------------------- guardado --------------------------------- */
+  /* ------------------------------- publicación ------------------------------- */
 
-  async function guardar(fichero) {
+  function pintarBarra() {
+    var barra = document.getElementById("barra-publicar");
+    var cuenta = document.getElementById("pendientes");
+    if (!barra) return;
+    var partes = [];
+    if (pendiente.proyectos) partes.push("proyectos");
+    if (pendiente.material) partes.push("catálogo");
+    if (pendiente.textos) partes.push("textos");
+    if (!partes.length) {
+      barra.hidden = true;
+      sucio = false;
+      return;
+    }
+    barra.hidden = false;
+    cuenta.textContent = "Sin publicar: " + partes.join(", ");
+  }
+
+  async function publicar() {
     if (!estado || !estado.cargado) {
       toast(
-        "No se han podido leer los datos del repositorio, así que no se guarda nada " +
-        "(así no se puede borrar contenido por accidente). Pulsa «Recargar» y, si sigue " +
-        "igual, «Diagnóstico».",
+        "No se han podido leer los datos del repositorio, así que no se publica nada. " +
+          "Pulsa «Recargar» y, si sigue igual, «Diagnóstico».",
         "error"
       );
       return;
     }
+    if (!pendiente.proyectos && !pendiente.material && !pendiente.textos) {
+      toast("No hay cambios pendientes.", "error");
+      return;
+    }
 
     var confirmar = false;
-    var previos = estado.cargados || { proyectos: estado.proyectos.datos.length, material: estado.material.datos.length };
-    if (fichero === "proyectos" && estado.proyectos.datos.length < previos.proyectos) {
+    var previos = estado.cargados || {
+      proyectos: estado.proyectos.datos.length,
+      material: estado.material.datos.length
+    };
+    if (pendiente.proyectos && estado.proyectos.datos.length < previos.proyectos) {
       confirmar = confirm(
-        "Ahora mismo hay " + previos.proyectos + " proyectos en la web y vas a " +
-        "guardar " + estado.proyectos.datos.length + ". ¿Seguro que quieres borrar " +
-        (previos.proyectos - estado.proyectos.datos.length) + "?"
+        "Hay " + previos.proyectos + " proyectos en la web y vas a dejar " +
+          estado.proyectos.datos.length + ". ¿Seguro que quieres borrar " +
+          (previos.proyectos - estado.proyectos.datos.length) + "?"
       );
       if (!confirmar) return;
     }
-    if (fichero === "material" && estado.material.datos.length < previos.material) {
+    if (pendiente.material && estado.material.datos.length < previos.material) {
       confirmar = confirm(
-        "Hay " + previos.material + " referencias en el catálogo y vas a guardar " +
-        estado.material.datos.length + ". ¿Seguro?"
+        "Hay " + previos.material + " referencias en el catálogo y vas a dejar " +
+          estado.material.datos.length + ". ¿Seguro?"
       );
       if (!confirmar) return;
-    }
-    var cuerpo;
-    if (fichero === "proyectos") {
-      cuerpo = {
-        action: "save",
-        fichero: "proyectos",
-        datos: { general: estado.proyectos.general, proyectos: estado.proyectos.datos },
-        baseSha: estado.proyectos.sha,
-        confirmar: confirmar
-      };
-    } else if (fichero === "material") {
-      cuerpo = {
-        action: "save",
-        fichero: "material",
-        datos: { material: estado.material.datos },
-        baseSha: estado.material.sha,
-        confirmar: confirmar
-      };
-    } else {
-      cuerpo = {
-        action: "save",
-        fichero: "textos",
-        datos: { textos: estado.textos.datos },
-        baseSha: estado.textos.sha
-      };
     }
 
-    Array.prototype.forEach.call(document.querySelectorAll("[data-guardar]"), function (b) {
-      b.disabled = true;
-    });
-    aviso("Guardando y publicando…");
+    var cambios = {};
+    if (pendiente.proyectos) {
+      cambios.proyectos = {
+        general: estado.proyectos.general,
+        datos: estado.proyectos.datos
+      };
+    }
+    if (pendiente.material) cambios.material = { datos: estado.material.datos };
+    if (pendiente.textos) cambios.textos = { datos: estado.textos.datos };
+
+    var boton = document.getElementById("btn-publicar");
+    boton.disabled = true;
+    boton.textContent = "Publicando…";
+    aviso("Publicando…");
     try {
-      var resultado = await api("save", cuerpo);
+      var resultado = await api("publicar", {
+        action: "publicar",
+        cambios: cambios,
+        baseSha: estado.cabeza || null,
+        confirmar: confirmar
+      });
       if (resultado.sinCambios) {
-        marcarLimpio("Sin cambios que guardar", "ok");
+        marcarLimpio("No había cambios reales que publicar", "ok");
+        toast("Nada que publicar: el contenido es idéntico al de la web.", "ok");
       } else {
-        marcarLimpio(
-          "Guardado ✓ commit " + (resultado.commit || "") + " · la web se actualiza en ~60 s",
+        marcarLimpio("Publicado ✓ " + resultado.commit, "ok");
+        toast(
+          "Publicado en un solo commit (" + resultado.commit + "):\n" +
+            (resultado.mensaje || "") +
+            "\n\nLa web se actualiza en ~60 s.",
           "ok"
         );
       }
+      pendiente = { proyectos: false, material: false, textos: false };
+      sucio = false;
+      pintarBarra();
       var fresco = await api("load");
-      ["proyectos", "material", "textos"].forEach(function (clave) {
-        if (fresco[clave]) estado[clave].sha = fresco[clave].sha;
-      });
+      estado.cabeza = fresco.cabeza || estado.cabeza;
       estado.cargados = {
         proyectos: estado.proyectos.datos.length,
         material: estado.material.datos.length
       };
-      toast("Cambios publicados. La web se actualiza en ~60 s.", "ok");
     } catch (error) {
       marcarLimpio(error.message, "error");
       toast(error.message, "error");
       if (error.codigo === 409) {
-        estado = await api("load");
-        pintarTodo();
+        toast("Recargando el contenido del repositorio…", "error");
+        await cargarTodo();
+        pendiente = { proyectos: false, material: false, textos: false };
+        pintarBarra();
       }
     } finally {
-      Array.prototype.forEach.call(document.querySelectorAll("[data-guardar]"), function (b) {
-        b.disabled = false;
-      });
+      boton.disabled = false;
+      boton.textContent = "Subir todos los cambios";
     }
   }
 
-  Array.prototype.forEach.call(document.querySelectorAll("[data-guardar]"), function (boton) {
-    boton.addEventListener("click", function () { guardar(boton.dataset.guardar); });
+  document.getElementById("btn-publicar").addEventListener("click", publicar);
+
+  document.getElementById("btn-descartar").addEventListener("click", async function () {
+    if (!confirm("¿Descartar todos los cambios sin publicar?")) return;
+    pendiente = { proyectos: false, material: false, textos: false };
+    sucio = false;
+    pintarBarra();
+    await cargarTodo();
+    toast("Cambios descartados.", "ok");
   });
 
   document.addEventListener("keydown", function (e) {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
       e.preventDefault();
       if (document.getElementById("app").hidden) return;
-      guardar(tabActual === "material" ? "material" : tabActual === "textos" ? "textos" : "proyectos");
+      publicar();
     }
   });
 
