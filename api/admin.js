@@ -209,6 +209,36 @@ function slug(valor) {
     .slice(0, 60);
 }
 
+/* Un único identificador por categoría: así «Videoclip», «videoclip» o
+   «Videoclips» no generan dos pestañas distintas en proyectos.html. */
+function tipoCanonico(valor) {
+  const limpio = String(valor == null ? "" : valor)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+  const alias = {
+    videoclip: "videoclip",
+    videoclips: "videoclip",
+    "video clip": "videoclip",
+    "video clips": "videoclip",
+    "video musical": "videoclip",
+    corto: "cortometraje",
+    cortos: "cortometraje",
+    cortometrajes: "cortometraje",
+    publicidad: "publicidad",
+    publicidades: "publicidad",
+    spot: "spot",
+    spots: "spot",
+    documental: "documental",
+    documentales: "documental",
+    ficcion: "ficcion",
+    "video de ficcion": "ficcion"
+  };
+  return alias[limpio] || limpio;
+}
+
 /* --------------------------- lectura / escritura --------------------------- */
 
 async function leerFichero(ruta) {
@@ -414,12 +444,13 @@ function normalizarProyectos(datos) {
     const proyecto = {
       slug: slug(p && p.slug),
       titulo: texto(p && p.titulo, 120),
-      tipo: texto(p && p.tipo, 40),
+      tipo: tipoCanonico(p && p.tipo),
       artista: texto(p && p.artista, 120),
       youtube: texto(p && p.youtube, 20).replace(/[^A-Za-z0-9_-]/g, ""),
       link: texto(p && p.link, 500),
       director: texto(p && p.director, 120),
       productora: texto(p && p.productora, 160),
+      fotografia: texto(p && p.fotografia, 120),
       year: texto(p && p.year, 12),
       rol: texto(p && p.rol, 160),
       descripcion: texto(p && p.descripcion, 1200),
@@ -840,6 +871,7 @@ async function importar(datos) {
     link: info.enlace,
     director: "",
     productora: "",
+    fotografia: "",
     year: "",
     rol: markos.rol ? "Técnico de iluminación (gaffer)" : "",
     descripcion: "",

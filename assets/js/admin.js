@@ -28,6 +28,7 @@
     { clave: "year", etiqueta: "Año", ancho: false },
     { clave: "director", etiqueta: "Dirección", ancho: false },
     { clave: "productora", etiqueta: "Productora", ancho: false },
+    { clave: "fotografia", etiqueta: "Dirección de fotografía", ancho: false },
     { clave: "rol", etiqueta: "Tu función", ancho: false },
     { clave: "youtube", etiqueta: "ID de YouTube", ayuda: "Solo el código, no la URL entera. Vacío si no hay vídeo.", ancho: false },
     { clave: "link", etiqueta: "Enlace del vídeo", ancho: true },
@@ -36,6 +37,36 @@
   ];
 
   /* ------------------------------ utilidades ------------------------------ */
+
+  /* Misma normalización que /api/admin: evita que «Videoclip», «videoclip»
+     o «Videoclips» acaben creando pestañas duplicadas en proyectos.html. */
+  function tipoClave(valor) {
+    var limpio = String(valor == null ? "" : valor)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    var alias = {
+      videoclip: "videoclip",
+      videoclips: "videoclip",
+      "video clip": "videoclip",
+      "video clips": "videoclip",
+      "video musical": "videoclip",
+      corto: "cortometraje",
+      cortos: "cortometraje",
+      cortometrajes: "cortometraje",
+      publicidad: "publicidad",
+      publicidades: "publicidad",
+      spot: "spot",
+      spots: "spot",
+      documental: "documental",
+      documentales: "documental",
+      ficcion: "ficcion",
+      "video de ficcion": "ficcion"
+    };
+    return alias[limpio] || limpio;
+  }
 
   function h(tag, props, hijos) {
     var el = document.createElement(tag);
@@ -353,6 +384,16 @@
         }
       });
       cuerpo.appendChild(c);
+      if (def.clave === "tipo") {
+        c.control.addEventListener("change", function () {
+          var canonico = tipoClave(c.control.value);
+          if (c.control.value !== canonico) c.control.value = canonico;
+          proyecto.tipo = canonico;
+          cabecera.querySelector(".ficha-meta").textContent =
+            [proyecto.tipo, proyecto.artista].filter(Boolean).join(" · ");
+          marcarSucio("proyectos");
+        });
+      }
     });
 
     cuerpo.appendChild(campo({
@@ -475,6 +516,7 @@
       link: "",
       director: "",
       productora: "",
+      fotografia: "",
       year: "",
       rol: "Técnico de iluminación (gaffer)",
       descripcion: "",

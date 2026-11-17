@@ -46,9 +46,28 @@
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
     });
   }
+  function tipoClave(t) {
+    var limpio = String(t == null ? "" : t)
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+    var alias = {
+      videoclip: "videoclip", videoclips: "videoclip", "video clip": "videoclip",
+      "video clips": "videoclip", "video musical": "videoclip",
+      corto: "cortometraje", cortos: "cortometraje", cortometrajes: "cortometraje",
+      publicidad: "publicidad", publicidades: "publicidad",
+      spot: "spot", spots: "spot",
+      documental: "documental", documentales: "documental",
+      ficcion: "ficcion", "video de ficcion": "ficcion"
+    };
+    return alias[limpio] || limpio;
+  }
   function tipoLabel(t) {
-    var m = { videoclip: "Videoclip", cortometraje: "Cortometraje", spot: "Spot", documental: "Documental", ficcion: "Ficción" };
-    return m[t] || t || "";
+    var clave = tipoClave(t);
+    var m = { videoclip: "Videoclip", cortometraje: "Cortometraje", spot: "Spot", documental: "Documental", ficcion: "Ficción", publicidad: "Publicidad" };
+    return m[clave] || clave || "";
   }
   function artistaCorto(p) {
     return String(p.artista || "").split("·")[0].trim();
@@ -190,8 +209,8 @@
   var gridProy = document.getElementById("grid-proyectos");
   if (gridProy) {
     var barraFiltros = document.getElementById("filtros-proyectos");
-    var inicial = (new URLSearchParams(location.search).get("tipo") || "todos").toLowerCase();
-    var tipos = ["todos"].concat(PROYECTOS.map(function (p) { return p.tipo; })
+    var inicial = tipoClave(new URLSearchParams(location.search).get("tipo") || "todos");
+    var tipos = ["todos"].concat(PROYECTOS.map(function (p) { return tipoClave(p.tipo); })
       .filter(function (t, i, a) { return t && a.indexOf(t) === i; }));
 
     if (barraFiltros) {
@@ -209,7 +228,7 @@
     }
 
     function aplicar(tipo) {
-      var lista = PROYECTOS.filter(function (p) { return tipo === "todos" || p.tipo === tipo; });
+      var lista = PROYECTOS.filter(function (p) { return tipo === "todos" || tipoClave(p.tipo) === tipo; });
       gridProy.innerHTML = lista.map(cardHTML).join("") ||
         '<p class="rent-empty">No hay proyectos en esta categoría.</p>';
       gridProy.querySelectorAll(".reveal").forEach(function (el) { io.observe(el); });
@@ -244,6 +263,7 @@
       document.getElementById("pj-funcion").innerHTML = pend(p.rol);
       document.getElementById("pj-director").innerHTML = pend(p.director);
       document.getElementById("pj-productora").innerHTML = pend(p.productora || p.artista);
+      document.getElementById("pj-fotografia").innerHTML = pend(p.fotografia);
       document.getElementById("pj-anio").innerHTML = pend(p.year);
       document.getElementById("pj-tipo").innerHTML = esc(tipoLabel(p.tipo));
 
@@ -300,8 +320,8 @@
         .map(function (x) {
           var score = 0;
           if (base && (x.artista || "").toLowerCase().indexOf(base) === 0) score += 3;
-          if (x.tipo === p.tipo) score += 2;
-          if (x.tipo === p.tipo && (x.artista || "").toLowerCase().indexOf(base) === 0) score += 1;
+          if (tipoClave(x.tipo) === tipoClave(p.tipo)) score += 2;
+          if (tipoClave(x.tipo) === tipoClave(p.tipo) && (x.artista || "").toLowerCase().indexOf(base) === 0) score += 1;
           return { p: x, score: score };
         })
         .sort(function (a, b) { return b.score - a.score; })

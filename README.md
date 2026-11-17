@@ -8,7 +8,7 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 |---|---|
 | `index.html` | Portada: hero + proyectos destacados + acceso al alquiler |
 | `proyectos.html` | Grid de proyectos con filtro por tipo (videoclip / cortometraje) |
-| `proyecto.html` | Ficha: función, tipo, dirección, productora/artista, año, vídeo y **proyectos parecidos** (`?p=slug`) |
+| `proyecto.html` | Ficha: función, tipo, dirección, dirección de fotografía, productora/artista, año, vídeo y **proyectos parecidos** (`?p=slug`) |
 | `alquiler.html` | Catálogo interactivo con categorías, búsqueda, fotos, fichas y **solicitud de presupuesto** |
 | `sobre-mi.html` | Texto pendiente de completar |
 | `contacto.html` | Email, Instagram y acceso al alquiler, editables desde el panel |
@@ -27,7 +27,9 @@ Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el
 ## Datos editables
 
 - **`assets/js/data.js`** — datos generales (nombre, email, Instagram) y proyectos.
-  Los campos vacíos (`director`, `productora`, `year`, `descripcion`) se muestran como «Por confirmar».
+  Los campos vacíos (`director`, `fotografia`, `productora`, `year`, `descripcion`) se muestran como «Por confirmar».
+  El `tipo` se guarda normalizado (minúsculas, sin acentos ni plurales) para que «Videoclip»,
+  «videoclip» y «Videoclips» sean una sola categoría y no dupliquen las pestañas del grid.
   Campos opcionales por proyecto: `preview` (segundo por el que empieza el clip del grid) y
   `thumb` (miniatura propia, p. ej. `assets/img/proyectos/<slug>.jpg`); si no hay `thumb`,
   la miniatura sale de YouTube a partir del id.
