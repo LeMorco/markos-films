@@ -173,6 +173,20 @@ window.MARKOS = {
       "nota": "Cortometraje no disponible íntegro en abierto. Se enlaza la pieza publicada por el Gobierno de Navarra.",
       "preview": 5,
       "thumb": "assets/img/proyectos/lo-que-queda-todavia.jpg"
+    },
+    {
+      "slug": "oparitu-mundua-aldatzeko-hazi-bat",
+      "titulo": "Oparitu mundua aldatzeko hazi bat",
+      "tipo": "",
+      "artista": "Txalaparta",
+      "youtube": "Uwi6OgivB5U",
+      "link": "https://www.youtube.com/watch?v=Uwi6OgivB5U",
+      "director": "",
+      "productora": "",
+      "year": "",
+      "rol": "Técnico de iluminación (gaffer)",
+      "descripcion": "",
+      "nota": ""
     }
   ]
 };
