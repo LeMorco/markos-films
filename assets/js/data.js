@@ -33,7 +33,9 @@ window.MARKOS = {
       "year": "2026",
       "rol": "Gaffer",
       "descripcion": "",
-      "nota": ""
+      "nota": "",
+      "preview": 36,
+      "previewFin": 43
     },
     {
       "slug": "en-estado-de-coma",
