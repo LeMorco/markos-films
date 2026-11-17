@@ -93,10 +93,11 @@ async function resolveTeamId() {
 
   if (!team) {
     const available = teams.map((item) => item.slug).filter(Boolean).join(', ') || '(ninguno)';
-    throw new Error(
-      `No encuentro el equipo "${teamSlug}". Equipos disponibles para este token: ${available}. ` +
-        'Revisa VERCEL_TEAM_SLUG o usa VERCEL_TEAM_ID.',
+    console.log(
+      `  · No encuentro el equipo "${teamSlug}". Equipos disponibles para este token: ${available}. ` +
+      'Se probará la cuenta personal.'
     );
+    return null;
   }
 
   return team.id;
