@@ -846,7 +846,11 @@ module.exports = async function handler(req, res) {
     if (accion === "save") {
       if (req.method !== "POST") return json(res, 405, { error: "Usa POST" });
       const datos = enviado;
-      const resultado = await guardar(datos.fichero, datos.datos || {}, datos.baseSha);
+      const resultado = await guardar(
+        datos.fichero,
+        Object.assign({}, datos.datos || {}, { confirmar: datos.confirmar === true }),
+        datos.baseSha
+      );
       return json(res, 200, resultado);
     }
 

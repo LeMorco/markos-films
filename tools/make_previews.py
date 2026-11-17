@@ -41,12 +41,20 @@ SALIDA = os.path.join(RAIZ, "assets", "video", "preview")
 
 
 def proyectos():
+    """(slug, id de YouTube, segundo de inicio) de cada proyecto.
+
+    Sirve tanto para data.js escrito a mano (claves sin comillas) como para el
+    que reescribe el panel (/admin), que las deja entrecomilladas como JSON.
+    """
     src = open(os.path.join(RAIZ, "assets", "js", "data.js"), encoding="utf-8").read()
-    for slug, cuerpo in re.findall(r'\{\s*slug:\s*"([^"]+)",(.*?)\n    \}', src, re.S):
-        yt = re.search(r'youtube:\s*"([^"]+)"', cuerpo)
-        pv = re.search(r'preview:\s*(\d+)', cuerpo)
-        if yt and yt.group(1):
-            yield slug, yt.group(1), int(pv.group(1)) if pv else None
+    marcas = list(re.finditer(r'["\']?slug["\']?\s*:\s*"([^"]+)"', src))
+    for i, marca in enumerate(marcas):
+        final = marcas[i + 1].start() if i + 1 < len(marcas) else len(src)
+        bloque = src[marca.end():final]
+        yt = re.search(r'["\']?youtube["\']?\s*:\s*"([^"]*)"', bloque)
+        pv = re.search(r'["\']?preview["\']?\s*:\s*(\d+)', bloque)
+        if yt and yt.group(1).strip():
+            yield marca.group(1), yt.group(1).strip(), int(pv.group(1)) if pv else None
 
 
 EXTENSIONES = (".mp4", ".mov", ".m4v", ".mkv", ".webm", ".avi", ".mts", ".m2ts", ".mpg", ".mpeg", ".wmv")
