@@ -45,12 +45,31 @@ jobs:
           YT_COOKIES: ${{ secrets.YT_COOKIES }}
         run: |
           if [ -n "$YT_COOKIES" ]; then
-            printf '%s' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
+            printf '%s\n' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
             echo "YTDLP_COOKIES_FILE=$RUNNER_TEMP/cookies.txt" >> "$GITHUB_ENV"
             echo "Cookies de YouTube cargadas desde el secreto YT_COOKIES."
           else
             echo "Sin YT_COOKIES: se intenta la descarga anónima."
           fi
+
+      - name: Comprobar configuración de descarga
+        env:
+          YTDLP_PROXY: ${{ secrets.YT_PROXY }}
+          YTDLP_EXTRACTOR_ARGS: ${{ vars.YTDLP_EXTRACTOR_ARGS }}
+        run: |
+          echo "yt-dlp: $(python -m yt_dlp --version)"
+          if [ -n "$YTDLP_COOKIES_FILE" ] && [ -f "$YTDLP_COOKIES_FILE" ]; then
+            echo "Cookies: cargadas ($(wc -c < "$YTDLP_COOKIES_FILE") bytes)"
+            if head -n 1 "$YTDLP_COOKIES_FILE" | grep -qi "Netscape"; then
+              echo "Formato de cookies: Netscape ✓"
+            else
+              echo "::warning::El archivo de cookies no parece formato Netscape. Exporta cookies.txt con la extensión «Get cookies.txt LOCALLY»."
+            fi
+          else
+            echo "::warning::No hay YTDLP_COOKIES_FILE: el secreto YT_COOKIES no está configurado, está vacío o se guardó como Variable en vez de Secret."
+          fi
+          echo "Extractor args: ${YTDLP_EXTRACTOR_ARGS:-(ninguno)}"
+          if [ -n "$YTDLP_PROXY" ]; then echo "Proxy: configurado"; else echo "Proxy: no configurado"; fi
 
       - name: Procesar la cola y publicar
         env:
