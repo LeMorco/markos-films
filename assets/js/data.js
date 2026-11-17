@@ -219,7 +219,9 @@ window.MARKOS = {
       "year": "",
       "rol": "Técnico de iluminación (gaffer)",
       "descripcion": "",
-      "nota": ""
+      "nota": "",
+      "preview": 90,
+      "previewFin": 97
     }
   ]
 };
