@@ -181,8 +181,7 @@
   grid.addEventListener("click", function (e) {
     var a = e.target.closest("[data-add]");
     if (a) {
-      if (!add(a.dataset.add)) return;   // ya está al máximo
-      openCart(true);
+      add(a.dataset.add);
       return;
     }
     var i = e.target.closest("[data-info]");
@@ -195,14 +194,10 @@
   var itemsEl = document.getElementById("cart-items");
   var badge = document.getElementById("cart-badge");
 
-  function openCart(focusMail) {
+  function openCart() {
     panel.classList.add("open");
     backdrop.classList.add("open");
     document.body.style.overflow = "hidden";
-    if (focusMail) setTimeout(function () {
-      var t = document.getElementById("cf-nombre");
-      if (t) t.focus();
-    }, 420);
   }
   function closeCart() {
     panel.classList.remove("open");
@@ -210,7 +205,7 @@
     document.body.style.overflow = "";
   }
   document.querySelectorAll("[data-cart-open]").forEach(function (b) {
-    b.addEventListener("click", function () { openCart(false); });
+    b.addEventListener("click", function () { openCart(); });
   });
   document.querySelectorAll("[data-cart-close]").forEach(function (b) {
     b.addEventListener("click", closeCart);
@@ -298,7 +293,6 @@
     if (btn && !tope) btn.addEventListener("click", function () {
       if (!add(id)) return;
       closeInfo();
-      openCart(true);
     });
     info.querySelectorAll("[data-info-close]").forEach(function (b) {
       b.addEventListener("click", closeInfo);
