@@ -47,7 +47,13 @@ const CLAVES_TEXTO = [
   "proyectos_intro",
   "alquiler_titulo",
   "alquiler_intro",
-  "contacto_titulo"
+  "contacto_titulo",
+  "sobre_titulo",
+  "sobre_bio",
+  "sobre_trayectoria",
+  "sobre_servicios",
+  "sobre_equipo",
+  "sobre_contacto"
 ];
 
 const intentos = new Map();

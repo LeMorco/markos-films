@@ -22,7 +22,17 @@
       if (!textos) return;
       Array.prototype.forEach.call(document.querySelectorAll("[data-txt]"), function (elemento) {
         var valor = textos[elemento.dataset.txt];
-        if (typeof valor === "string" && valor.trim()) aplicar(elemento, valor);
+        if (typeof valor === "string" && valor.trim()) {
+          aplicar(elemento, valor);
+          if (elemento.classList.contains("pending")) elemento.classList.remove("pending");
+          var campoMailto = elemento.dataset.txtMailto;
+          if (campoMailto) {
+            var correo = textos[campoMailto];
+            if (typeof correo === "string" && correo.trim()) {
+              elemento.setAttribute("href", "mailto:" + correo.trim());
+            }
+          }
+        }
       });
     })
     .catch(function () { /* si falla, se queda el texto original del HTML */ });

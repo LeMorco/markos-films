@@ -14,12 +14,18 @@
 
   var TEXTOS = [
     { clave: "hero_kicker", etiqueta: "Portada · antetítulo", ayuda: "La línea pequeña encima del titular del inicio." },
-    { clave: "hero_sub", etiqueta: "Portada · párrafo de entrada", ayuda: "El texto bajo «Luz para contar historias»." },
+    { clave: "hero_sub", etiqueta: "Portada · párrafo de entrada", ayuda: "El texto bajo «Luz para contar historias».", largo: true },
     { clave: "proyectos_titulo", etiqueta: "Proyectos · título", ayuda: "Cabecera de la página de proyectos." },
-    { clave: "proyectos_intro", etiqueta: "Proyectos · entradilla", ayuda: "Párrafo bajo ese título." },
+    { clave: "proyectos_intro", etiqueta: "Proyectos · entradilla", ayuda: "Párrafo bajo ese título.", largo: true },
     { clave: "alquiler_titulo", etiqueta: "Alquiler · título", ayuda: "Cabecera del catálogo." },
-    { clave: "alquiler_intro", etiqueta: "Alquiler · entradilla", ayuda: "Párrafo bajo ese título." },
-    { clave: "contacto_titulo", etiqueta: "Contacto · título", ayuda: "Titular de la página de contacto." }
+    { clave: "alquiler_intro", etiqueta: "Alquiler · entradilla", ayuda: "Párrafo bajo ese título.", largo: true },
+    { clave: "contacto_titulo", etiqueta: "Contacto · título", ayuda: "Titular de la página de contacto." },
+    { clave: "sobre_titulo", etiqueta: "Sobre mí · título", ayuda: "Cabecera de la página «Sobre mí»." },
+    { clave: "sobre_bio", etiqueta: "Sobre mí · presentación", ayuda: "Párrafo de presentación, junto al retrato.", largo: true },
+    { clave: "sobre_trayectoria", etiqueta: "Sobre mí · trayectoria", ayuda: "Texto del bloque «Trayectoria».", largo: true },
+    { clave: "sobre_servicios", etiqueta: "Sobre mí · servicios", ayuda: "Texto del bloque «Servicios».", largo: true },
+    { clave: "sobre_equipo", etiqueta: "Sobre mí · equipo propio", ayuda: "Texto del bloque «Equipo propio».", largo: true },
+    { clave: "sobre_contacto", etiqueta: "Sobre mí · contacto directo", ayuda: "Email del bloque «Contacto directo». También actualiza el enlace de correo." }
   ];
 
   var CAMPOS_PROYECTO = [
@@ -706,7 +712,7 @@
         etiqueta: def.etiqueta,
         ayuda: def.ayuda,
         ancho: true,
-        tipo: def.clave === "hero_sub" || def.clave === "alquiler_intro" || def.clave === "proyectos_intro" ? "textarea" : "text",
+        tipo: def.largo ? "textarea" : "text",
         largo: true,
         valor: estado.textos.datos[def.clave] || "",
         onInput: function (v) { estado.textos.datos[def.clave] = v; }
