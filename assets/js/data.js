@@ -210,5 +210,13 @@ window.MARKOS = {
       "preview": 5,
       "thumb": "assets/img/proyectos/oparitu-mundua-aldatzeko-hazi-bat.jpg"
     }
-  ]
+  ],
+  "portada": {
+    "slides": [
+      {
+        "slug": "cielo-y-mar",
+        "imagen": "assets/img/portada/cielo-y-mar-20261117-58d0.jpg"
+      }
+    ]
+  }
 };
