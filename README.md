@@ -16,7 +16,7 @@ Web estática (HTML + CSS + JS, sin build) para el portfolio de Marcos Donate co
 ## Movimiento e interacción
 
 - **Portadas rotatorias** en el inicio (5 fotogramas, 4 s cada uno, con barras de progreso clicables y pausa al pasar el ratón).
-- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. Al salir se descarga. Para añadir un proyecto nuevo, ejecuta `python tools/make_previews.py` (ver cabecera del script). Si tienes los vídeos originales en buena calidad, déjalos en `tools/maestros/` (nombre con el slug o el id de YouTube) y genera los clips desde ahí, sin pasar por YouTube: `python tools/make_previews.py --local tools/maestros --force --ancho 1280 --crf 19`. Esa carpeta está en `.gitignore`. Para uno o varios proyectos sueltos hay un atajo que hace todo (descarga cada original hasta 1080p en H.264, elige el tramo, saca la **miniatura** en `assets/img/proyectos/<slug>.jpg`, corta el clip mudo y lo publica): `python tools/add_preview.py <url> [<url> ...]`. La URL puede ser de **YouTube o de Facebook** (los vídeos públicos de Facebook no necesitan sesión; los verticales se enmarcan en 16:9 con fondo desenfocado, porque la web usa tarjetas horizontales). Si el vídeo todavía no está en `data.js`, deduce el slug a partir del título y te recuerda añadir la ficha. Opciones útiles: `--inicio 42` fija el segundo del clip, `--miniatura-segundo 1` elige otro fotograma para la miniatura (el 1 suele coger el rótulo del título), `--guardar-master` deja también el vídeo completo en `tools/maestros/` (no va al repo), `--no-push` corta el clip sin publicar y `--cookies-file cookies.txt` si YouTube o Facebook piden sesión. La descarga va con una sola conexión porque YouTube devuelve 403 al pedir fragmentos en paralelo sin sesión.
+- **Preview en vídeo** al pasar el ratón por un proyecto del grid (escritorio): reproduce un clip mudo propio (`assets/video/preview/<slug>.mp4`), sin reproductor de YouTube ni botones. El tramo exacto se elige en `/admin` (desde/hasta) y GitHub Actions lo genera al publicar; ver **Vistas previas online** más abajo. Si prefieres generarlos manualmente o desde originales en buena calidad, también existen `python tools/make_previews.py` y `python tools/add_preview.py`.
 - **Revelado tipográfico**: los titulares suben desde una máscara al entrar en pantalla.
 - **Parallax** suave en las portadas del grid (solo escritorio).
 - **Scroll con inercia** en ratón/trackpad + **barra de progreso** en el borde derecho.
@@ -30,9 +30,9 @@ Todo respeta `prefers-reduced-motion` (se desactiva la rotación automática, el
   Los campos vacíos (`director`, `fotografia`, `productora`, `year`, `descripcion`) se muestran como «Por confirmar».
   El `tipo` se guarda normalizado (minúsculas, sin acentos ni plurales) para que «Videoclip»,
   «videoclip» y «Videoclips» sean una sola categoría y no dupliquen las pestañas del grid.
-  Campos opcionales por proyecto: `preview` (segundo por el que empieza el clip del grid) y
-  `thumb` (miniatura propia, p. ej. `assets/img/proyectos/<slug>.jpg`); si no hay `thumb`,
-  la miniatura sale de YouTube a partir del id.
+  Campos opcionales por proyecto: `preview` (segundo por el que empieza el clip del grid),
+  `previewFin` (segundo final elegido en el panel) y `thumb` (miniatura propia,
+  p. ej. `assets/img/proyectos/<slug>.jpg`); si no hay `thumb`, la miniatura sale de YouTube a partir del id.
 - **`assets/img/proyectos/`** — miniaturas propias de los proyectos con vídeo fuera de YouTube.
 - **`assets/js/rental.js`** — catálogo: categorías y las 42 piezas con código, unidades y ficha.
 - **`assets/img/material/`** — foto de cada pieza, nombrada con su código (`A001.jpg`…).
@@ -47,7 +47,22 @@ En `/admin` → **Proyectos** hay un campo para pegar la URL de YouTube y pulsar
 - Saca el título y el artista del propio vídeo, genera el slug y guarda la ficha con el id, el enlace y la miniatura (la miniatura no se descarga: la web usa la de YouTube a partir del id, así que aparece sola en el grid y en la ficha).
 - Añade la ficha **al final** de la lista, sin tocar las que ya hay, y puedes completar tipo, año y descripción después.
 
-El **clip de 7 s** no se puede generar desde el servidor: YouTube bloquea las IPs de datacenter (probado en Vercel y en GitHub Actions con «Sign in to confirm you're not a bot»). Por eso el panel lo deja *en cola* en `content/cola-clips.json` y hay dos formas de generarlo desde tu red:
+El **clip de vista previa** se genera online, sin ejecutar nada en tu ordenador:
+
+1. En `/admin` → **Proyectos**, abre la ficha y elige **Vista previa · desde** y **Vista previa · hasta** (por ejemplo `1:20` y `1:27`).
+2. Pulsa **Subir todos los cambios**. El rango se guarda con el proyecto y se encola solo; el botón **Programar vista previa** sirve para comprobar el tramo y dejarlo preparado antes de publicar.
+3. Ese push incluye `content/cola-clips.json` y lanza el workflow `.github/workflows/preview-clips.yml`. GitHub Actions descarga el vídeo, corta **exactamente ese tramo**, genera la miniatura si falta, anota `preview`/`previewFin` en `data.js`, vacía la cola y publica el resultado con un commit `[preview-online]`. Vercel actualiza la web sola.
+
+El rango admite segundos (`80`) o `mm:ss` (`1:20`) y puede durar como máximo 15 s; para la vista previa se recomiendan 7 (de `1:20` a `1:27`).
+
+Si el workflow falla porque YouTube pide sesión en la IP del runner, añade uno de estos **secretos** en GitHub → Settings → Secrets and variables → Actions:
+
+| Secreto | Para qué |
+|---|---|
+| `YT_COOKIES` | contenido completo de un `cookies.txt` exportado del navegador |
+| `YT_PROXY` | proxy residencial si tu red o el vídeo lo necesitan |
+
+También puedes definir la variable `YTDLP_EXTRACTOR_ARGS` (por ejemplo `youtube:player_client=web_safari`) en **Variables**. Como último recurso, la cola sigue funcionando en local:
 
 ```
 # doble clic en la raíz del repo
@@ -76,6 +91,7 @@ Los cambios **se acumulan como borrador**: editas lo que quieras (la barra de ab
 - `admin.html` — interfaz (login, pestañas de Proyectos, Material, Textos, Sobre mí, Contacto y Ajustes).
 - `assets/js/admin.js` — formularios y llamadas al panel.
 - `api/admin.js` — función serverless: sesión firmada por cookie, validación y commit vía API de GitHub. El token y la contraseña viven en el servidor, nunca en el navegador.
+- `.github/workflows/preview-clips.yml` — genera online las vistas previas en cola (rango desde/hasta) y las publica.
 - `content/textos.json` — literales editables; `assets/js/textos.js` los aplica sobre los elementos con `data-txt` al cargar cada página.
 - `content/sobre-mi.json` — texto, foto y contacto de «Sobre mí»; `assets/js/sobre-mi.js` los aplica al cargar la página.
 - `content/contacto.json` — titular, email, textos y enlace de Instagram de «Contacto»; `assets/js/contacto.js` los aplica al cargar la página.

@@ -51,6 +51,14 @@ def _comando(extra, orden=None):
             "--no-playlist", "--no-warnings", "--no-mtime",
             "-N", "1", "--retries", "20", "--fragment-retries", "20",
             "--retry-sleep", "3"]
+    # Opciones pensadas para el workflow de GitHub Actions (y también útiles
+    # en local): proxy residencial y/o cliente/extractor concreto de YouTube.
+    proxy = os.environ.get("YTDLP_PROXY", "").strip()
+    if proxy:
+        base += ["--proxy", proxy]
+    extractor = os.environ.get("YTDLP_EXTRACTOR_ARGS", "").strip()
+    if extractor:
+        base += ["--extractor-args", extractor]
     if orden:
         base += ["-S", orden]
     return base + extra
@@ -82,6 +90,7 @@ def descargar(url, destino_sin_ext, intentos=2, cookies=None, cookies_file=None,
     prefijo = os.path.basename(destino_sin_ext)
 
     extra = []
+    cookies_file = cookies_file or os.environ.get("YTDLP_COOKIES_FILE", "").strip()
     if cookies_file:
         extra += ["--cookies", cookies_file]
     elif cookies:

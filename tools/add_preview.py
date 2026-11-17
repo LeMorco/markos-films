@@ -23,6 +23,7 @@ Uso:
     python tools/add_preview.py https://www.facebook.com/<pagina>/videos/<id>/
     python tools/add_preview.py <url1> <url2> <url3>      # varios de golpe
     python tools/add_preview.py <url> --slug mina --inicio 42
+    python tools/add_preview.py <url> --inicio 1:20 --fin 1:27
     python tools/add_preview.py <url> --guardar-master --no-push
     python tools/add_preview.py <url> --cookies-file cookies.txt   # si YouTube pide sesión
     python tools/add_preview.py <url> --sin-publicar-thumb   # no toca data.js
@@ -51,6 +52,26 @@ MINIATURAS = os.path.join(RAIZ, "assets", "img", "proyectos")
 DATA = os.path.join(RAIZ, "assets", "js", "data.js")
 
 FACEBOOK = ("facebook.com", "fb.watch", "fb.me")
+
+
+def parse_tiempo(valor):
+    """«1:20», «01:20,5» o «80» -> segundos. None si está vacío."""
+    if valor is None:
+        return None
+    bruto = str(valor).strip().replace(",", ".")
+    if not bruto:
+        return None
+    if re.fullmatch(r"\d+(?:\.\d+)?", bruto):
+        return int(round(float(bruto)))
+    partes = bruto.split(":")
+    if not 2 <= len(partes) <= 3:
+        return None
+    if not all(re.fullmatch(r"\d+(?:\.\d+)?", p) for p in partes):
+        return None
+    segundos = 0
+    for parte in partes:
+        segundos = segundos * 60 + float(parte)
+    return int(round(segundos))
 
 
 def id_youtube(url):
@@ -179,11 +200,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("urls", nargs="+", metavar="URL")
     ap.add_argument("--slug", help="slug del proyecto (solo con una URL; si no, se busca por id o enlace)")
-    ap.add_argument("--inicio", type=int, help="segundo del clip (por defecto, el tramo más luminoso)")
-    ap.add_argument("--miniatura-segundo", type=int, metavar="SEG",
-                    help="segundo del fotograma de la miniatura (por defecto, inicio + 1; "
-                         "para un vídeo con rótulo de título suele ir bien el 1). Si ya hay "
-                         "miniatura se mantiene salvo que pases esta opción")
+    ap.add_argument("--inicio", help="segundo inicial del clip: 42 o 1:20 (por defecto, el tramo más luminoso)")
+    ap.add_argument("--fin", help="segundo final del clip: 87 o 1:27. Si se indica, la duración sale de inicio–fin")
+    ap.add_argument("--miniatura-segundo", help="segundo del fotograma de la miniatura: 2 o 0:02 "
+                    "(por defecto, inicio + 1; para un vídeo con rótulo de título suele ir bien el 1). Si ya hay "
+                    "miniatura se mantiene salvo que pases esta opción")
     ap.add_argument("--dur", type=int, default=7, help="segundos de clip (7)")
     ap.add_argument("--ancho", type=int, default=1280, help="ancho máximo en px (1280)")
     ap.add_argument("--alto", type=int, default=720, help="alto máximo en px (720)")
@@ -201,6 +222,22 @@ def main():
     ap.add_argument("--no-push", action="store_true", help="no hace commit ni push")
     ap.add_argument("--force", action="store_true", help="regenera aunque el clip ya exista")
     args = ap.parse_args()
+    inicio_arg = parse_tiempo(args.inicio)
+    fin_arg = parse_tiempo(args.fin)
+    miniatura_arg = parse_tiempo(args.miniatura_segundo)
+    if args.inicio is not None and inicio_arg is None:
+        sys.exit("No entiendo el inicio «%s»; usa segundos o mm:ss (por ejemplo 1:20)." % args.inicio)
+    if args.fin is not None and fin_arg is None:
+        sys.exit("No entiendo el final «%s»; usa segundos o mm:ss (por ejemplo 1:27)." % args.fin)
+    if args.fin is not None and inicio_arg is None:
+        sys.exit("--fin necesita también --inicio")
+    if fin_arg is not None and fin_arg <= inicio_arg:
+        sys.exit("El final debe ser mayor que el inicio.")
+    dur = args.dur
+    if fin_arg is not None:
+        dur = fin_arg - inicio_arg
+        if dur > 30:
+            sys.exit("El clip no puede durar más de 30 s (para la vista previa se recomiendan 7).")
 
     if args.slug and len(args.urls) > 1:
         sys.exit("--slug solo tiene sentido con una URL. Para varios vídeos, que cada uno esté en data.js.")
@@ -241,24 +278,24 @@ def main():
             if alto and alto < 720:
                 print("   AVISO: el clip se verá blando; con cookies de sesión suele haber más calidad")
 
-            inicio = args.inicio if args.inicio is not None else preview
+            inicio = inicio_arg if inicio_arg is not None else preview
             if inicio is None:
-                inicio = mejor_inicio(brillo_por_segundo(ff, ruta), args.dur)
-            print("   tramo desde %d s" % inicio)
+                inicio = mejor_inicio(brillo_por_segundo(ff, ruta), dur)
+            print("   tramo desde %d s%s" % (inicio, " hasta %d s (%d s)" % (fin_arg, dur) if fin_arg is not None else ""))
 
             if os.path.exists(miniatura) and args.miniatura_segundo is None:
                 # se respeta el fotograma elegido a mano en una pasada anterior
                 # (para rehacerla, pasa --miniatura-segundo)
                 print("   miniatura: se mantiene la que ya hay")
-            elif guardar_miniatura(ff, ruta, inicio + 1 if args.miniatura_segundo is None
-                                   else args.miniatura_segundo, miniatura, vertical=vertical):
+            elif guardar_miniatura(ff, ruta, inicio + 1 if miniatura_arg is None
+                                   else miniatura_arg, miniatura, vertical=vertical):
                 print("   miniatura: %s (%d KB)" % (os.path.relpath(miniatura, RAIZ).replace("\\", "/"),
                                                     os.path.getsize(miniatura) // 1024))
             else:
                 print("   AVISO: no se ha podido extraer la miniatura")
                 miniatura = ""
 
-            if not cortar(ff, ruta, inicio, args.dur, args.ancho, args.alto, args.crf, destino,
+            if not cortar(ff, ruta, inicio, dur, args.ancho, args.alto, args.crf, destino,
                           vertical=vertical):
                 print("   error al cortar el clip")
                 fallos.append(url)
@@ -272,7 +309,7 @@ def main():
                 shutil.move(ruta, final)
                 print("   original guardado en tools/maestros/" + os.path.basename(final))
 
-            campos = {"preview": inicio}
+            campos = {"preview": inicio, "previewFin": inicio + dur}
             if miniatura:
                 campos["thumb"] = os.path.relpath(miniatura, RAIZ).replace("\\", "/")
             if args.sin_publicar_thumb:

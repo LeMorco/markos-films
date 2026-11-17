@@ -1,0 +1,62 @@
+name: Generar vistas previas
+
+# Se dispara cuando el panel publica una vista previa en cola
+# (content/cola-clips.json va en el mismo commit que los proyectos).
+on:
+  push:
+    branches: [main]
+    paths:
+      - content/cola-clips.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: preview-clips
+  cancel-in-progress: false
+
+jobs:
+  previews:
+    # El commit que hace este mismo workflow no debe relanzarlo.
+    if: github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[preview-online]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: yt-dlp
+        run: pip install --upgrade yt-dlp
+
+      - name: Cookies de YouTube (opcional)
+        # Si YouTube pide sesión en el runner, guarda un cookies.txt en el
+        # secreto YT_COOKIES. Sin cookies, muchos vídeos siguen funcionando.
+        env:
+          YT_COOKIES: ${{ secrets.YT_COOKIES }}
+        run: |
+          if [ -n "$YT_COOKIES" ]; then
+            printf '%s' "$YT_COOKIES" > "$RUNNER_TEMP/cookies.txt"
+            echo "YTDLP_COOKIES_FILE=$RUNNER_TEMP/cookies.txt" >> "$GITHUB_ENV"
+            echo "Cookies de YouTube cargadas desde el secreto YT_COOKIES."
+          else
+            echo "Sin YT_COOKIES: se intenta la descarga anónima."
+          fi
+
+      - name: Procesar la cola y publicar
+        env:
+          YTDLP_PROXY: ${{ secrets.YT_PROXY }}
+          YTDLP_EXTRACTOR_ARGS: ${{ vars.YTDLP_EXTRACTOR_ARGS }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          python tools/procesar_cola.py --ci

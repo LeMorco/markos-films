@@ -239,6 +239,63 @@ function tipoCanonico(valor) {
   return alias[limpio] || limpio;
 }
 
+/* «1:20», «01:20,5» o «80» -> segundos. null si no es válido. */
+function segundosTiempo(valor) {
+  const bruto = String(valor == null ? "" : valor).trim().replace(",", ".");
+  if (!bruto) return null;
+  if (/^\d+(\.\d+)?$/.test(bruto)) return Math.round(Number(bruto));
+  const partes = bruto.split(":");
+  if (partes.length < 2 || partes.length > 3) return null;
+  if (!partes.every((p) => /^\d+(\.\d+)?$/.test(p))) return null;
+  let segundos = 0;
+  partes.forEach((p) => { segundos = segundos * 60 + Number(p); });
+  return Math.round(segundos);
+}
+
+function normalizarClip(item) {
+  const url = texto(item && item.url, 500);
+  const vid = idYoutube(url);
+  const fb = vid ? null : idFacebook(url);
+  if (!vid && !fb) throw new Error("Esa URL no parece de YouTube ni de Facebook");
+  const nombre = slug(item && item.slug) || slug("clip-" + (vid || fb));
+
+  const inicio = segundosTiempo(item && item.inicio);
+  let fin = segundosTiempo(item && item.fin);
+  if (inicio == null && fin != null) {
+    throw new Error("Para el clip «" + nombre + "» falta el segundo inicial");
+  }
+  if (inicio != null && fin == null) fin = inicio + 7;
+  if (inicio != null) {
+    if (fin <= inicio) {
+      throw new Error("En «" + nombre + "» el final debe ser mayor que el inicio");
+    }
+    if (fin - inicio > 15) {
+      throw new Error("El clip de «" + nombre + "» dura " + (fin - inicio) +
+        " s; el máximo es 15 s (para la vista previa se recomiendan 7).");
+    }
+  }
+
+  const salida = {
+    slug: nombre,
+    url: vid ? "https://www.youtube.com/watch?v=" + vid : url
+  };
+  if (inicio != null) {
+    salida.inicio = inicio;
+    salida.fin = fin;
+  }
+  return salida;
+}
+
+function leerCola(textoPlano) {
+  if (!textoPlano) return [];
+  try {
+    const datos = JSON.parse(textoPlano);
+    return Array.isArray(datos) ? datos : [];
+  } catch (error) {
+    return [];
+  }
+}
+
 /* --------------------------- lectura / escritura --------------------------- */
 
 async function leerFichero(ruta) {
@@ -459,6 +516,9 @@ function normalizarProyectos(datos) {
     if (p && p.preview !== undefined && p.preview !== null && p.preview !== "") {
       proyecto.preview = Math.min(36000, Math.max(0, parseInt(p.preview, 10) || 0));
     }
+    if (p && p.previewFin !== undefined && p.previewFin !== null && p.previewFin !== "") {
+      proyecto.previewFin = Math.min(36000, Math.max(0, parseInt(p.previewFin, 10) || 0));
+    }
     if (p && p.destacado) proyecto.destacado = true;
     if (!proyecto.slug) throw new Error("Hay un proyecto sin slug");
     if (!proyecto.titulo) throw new Error("El proyecto " + proyecto.slug + " no tiene título");
@@ -597,15 +657,8 @@ async function cargar() {
     }
   };
   const colaClip = await leer(COLA_CLIPS);
-  let enCola = 0;
-  if (colaClip.texto) {
-    try {
-      const parseada = JSON.parse(colaClip.texto);
-      enCola = Array.isArray(parseada) ? parseada.length : 0;
-    } catch (error) {
-      enCola = 0;
-    }
-  }
+  const colaItems = leerCola(colaClip.texto);
+  const enCola = colaItems.length;
 
   const [proyectos, material, textos, sobre, contacto] = await Promise.all([
     leer(FICHEROS.proyectos.ruta),
@@ -656,6 +709,7 @@ async function cargar() {
     errores,
     cabeza,
     cola: enCola,
+    colaItems,
     proyectos: {
       datos: markos.proyectos || [],
       general: {
@@ -934,34 +988,23 @@ async function subirImagen(datos) {
 }
 
 async function encolarClip(datos) {
-  const url = texto(datos.url, 300);
-  const vid = idYoutube(url);
-  const fb = vid ? null : idFacebook(url);
-  if (!vid && !fb) throw new Error("Esa URL no parece de YouTube ni de Facebook");
-  const nombre = slug(datos.slug) || slug("clip-" + (vid || fb));
+  const item = normalizarClip({
+    url: datos.url,
+    slug: datos.slug,
+    inicio: datos.inicio,
+    fin: datos.fin
+  });
 
   const actual = await leerFichero(COLA_CLIPS);
-  let cola = [];
-  if (actual.texto) {
-    try {
-      cola = JSON.parse(actual.texto);
-    } catch (error) {
-      cola = [];
-    }
-  }
-  if (!Array.isArray(cola)) cola = [];
-  cola = cola.filter((c) => c && c.slug !== nombre);
-  cola.push({
-    slug: nombre,
-    url: vid ? "https://www.youtube.com/watch?v=" + vid : url,
-    inicio: datos.inicio == null ? null : Math.max(0, parseInt(datos.inicio, 10) || 0)
-  });
+  let cola = leerCola(actual.texto);
+  cola = cola.filter((c) => c && c.slug !== item.slug);
+  cola.push(item);
 
   const resultado = await escribirFichero(
     COLA_CLIPS,
     JSON.stringify(cola, null, 2) + "\n",
     actual.sha,
-    "Panel: en cola el clip de " + nombre
+    "Panel: en cola el clip de " + item.slug
   );
   return { ok: true, enCola: cola.length, commit: resultado.commit };
 }
@@ -1026,6 +1069,8 @@ async function publicar(datos, baseSha) {
   const ficheros = [];
   const titulos = [];
   const detalle = [];
+  let totalCola = null;
+  const colaAuto = [];
 
   if (cambios.proyectos) {
     const actual = await leerFichero(FICHEROS.proyectos.ruta);
@@ -1042,6 +1087,25 @@ async function publicar(datos, baseSha) {
     }
 
     const diff = diferir(viejos, nuevos, "slug");
+    const mapaViejos = new Map();
+    viejos.forEach((p) => { if (p && p.slug) mapaViejos.set(p.slug, p); });
+    nuevos.forEach((p) => {
+      const antes = mapaViejos.get(p.slug);
+      const cambioPreview = !antes ||
+        antes.preview !== p.preview || antes.previewFin !== p.previewFin;
+      if (!cambioPreview || p.preview == null) return;
+      const url = p.youtube
+        ? "https://www.youtube.com/watch?v=" + p.youtube
+        : /(?:facebook\.com|fb\.watch|fb\.me)/i.test(p.link || "")
+          ? p.link
+          : "";
+      if (!url) return;
+      const fin = p.previewFin != null && p.previewFin > p.preview
+        ? p.previewFin
+        : p.preview + 7;
+      if (fin - p.preview > 15) return;
+      colaAuto.push({ slug: p.slug, url, inicio: p.preview, fin });
+    });
     const nuevoObjeto = Object.assign({}, markos);
     let generalCambiado = false;
     if (cambios.proyectos.general) {
@@ -1139,15 +1203,44 @@ async function publicar(datos, baseSha) {
     }
   }
 
+  /* La vista previa se guarda en el mismo commit que los proyectos: así
+     GitHub Actions la genera al recibir el push, sin adelantarse a la
+     publicación ni provocar conflictos en el panel. */
+  if ((Array.isArray(datos.cola) && datos.cola.length) || colaAuto.length) {
+    const actual = await leerFichero(COLA_CLIPS);
+    const cola = leerCola(actual.texto);
+    const mapa = new Map();
+    cola.forEach((item) => {
+      if (item && item.slug) mapa.set(item.slug, item);
+    });
+    const nuevos = []
+      .concat(Array.isArray(datos.cola) ? datos.cola : [])
+      .concat(colaAuto)
+      .map(normalizarClip);
+    const mapaNuevos = new Map();
+    nuevos.forEach((item) => mapaNuevos.set(item.slug, item));
+    const unicos = Array.from(mapaNuevos.values());
+    unicos.forEach((item) => mapa.set(item.slug, item));
+    totalCola = mapa.size;
+    const contenido = JSON.stringify(Array.from(mapa.values()), null, 2) + "\n";
+    if (contenido !== actual.texto) {
+      ficheros.push({ ruta: COLA_CLIPS, contenido });
+      titulos.push(unicos.length +
+        (unicos.length === 1 ? " vista previa en cola" : " vistas previas en cola"));
+      unicos.forEach((item) => detalle.push("+ clip: " + item.slug +
+        (item.inicio != null ? " (" + item.inicio + "-" + item.fin + " s)" : "")));
+    }
+  }
+
   const conTitulo = titulos.filter(Boolean);
   if (!ficheros.length) {
-    return { sinCambios: true, mensaje: "No hay cambios que publicar" };
+    return { sinCambios: true, mensaje: "No hay cambios que publicar", cola: totalCola };
   }
 
   const mensaje = "Panel: " + (conTitulo.join(" · ") || "cambios de contenido");
   const cuerpo = detalle.length ? detalle.join("\n") : "";
   const resultado = await commitMultiple(ficheros, mensaje, cuerpo, baseSha);
-  return { ok: true, commit: resultado.commit, mensaje, ficheros: ficheros.length, detalle };
+  return { ok: true, commit: resultado.commit, mensaje, ficheros: ficheros.length, detalle, cola: totalCola };
 }
 
 /* ---------------------------------- handler ---------------------------------- */
